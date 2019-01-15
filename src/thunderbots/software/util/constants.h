@@ -22,5 +22,9 @@ namespace Util
         // Networking and vision
         static const std::string SSL_VISION_MULTICAST_ADDRESS = "224.5.23.2";
         static const unsigned short SSL_VISION_MULTICAST_PORT = 10020;
+
+        // SSL Game Controller address
+        static const std::string SSL_GAMECONTROLLER_MULTICAST_ADDRESS = "224.5.23.1";
+        static const unsigned short SSL_GAMECONTROLLER_MULTICAST_PORT = 10003;
     }  // namespace Constants
 }  // namespace Util

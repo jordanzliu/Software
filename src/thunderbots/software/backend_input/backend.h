@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <proto/ssl_referee.pb.h>
 
 #include "backend_input/filter/ball_filter.h"
 #include "backend_input/filter/robot_filter.h"
@@ -69,6 +70,8 @@ class Backend
      */
     std::optional<thunderbots_msgs::Team> getFilteredEnemyTeamMsg(
         const SSL_WrapperPacket &packet, const AITimestamp &timestamp);
+
+    std::optional<thunderbots_msgs::RefboxData> getRefboxDataMsg(const Referee &packet);
 
     virtual ~Backend() = default;
 
