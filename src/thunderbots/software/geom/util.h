@@ -12,6 +12,17 @@
 
 template <size_t N>
 using Poly     = std::array<Vector, N>;
+
+template <size_t M>
+using PolyIteratorPair =
+        std::pair<typename Poly<M>::const_iterator,
+        typename Poly<M>::const_iterator>;
+
+template <size_t A>
+PolyIteratorPair<A> getIteratorPair(Poly<A> poly) {
+    return {poly.begin(), poly.end()};
+}
+
 using Triangle = Poly<3>;
 using Quad     = Poly<4>;
 
