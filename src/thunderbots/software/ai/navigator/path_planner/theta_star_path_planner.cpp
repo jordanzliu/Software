@@ -8,9 +8,10 @@ namespace
 
     class PointNode : public ThetaStar::Node<PointNode, cost_type>
     {
-       public:
-        PointNode() = delete;
-        explicit PointNode(const Point &point) : _point(point){};
+    public:
+        PointNode():_point(){};
+        explicit PointNode(const Point &point) : _point(point),
+        ThetaStar::Node<PointNode, cost_type>(){};
 
         bool operator==(const PointNode &other)
         {
@@ -22,6 +23,8 @@ namespace
             return _point;
         }
 
+        ~PointNode() = default;
+
        private:
         const Point _point;
     };
@@ -29,11 +32,10 @@ namespace
     class Planner : public ThetaStar::Algorithm<PointNode, double>
     {
        public:
-        Planner() = delete;
+        ~Planner() = default;
         explicit Planner(const Point &dest) : dest_node(dest){};
 
        private:
-        ~Planner() = default;
         const PointNode dest_node;
     };
 }  // namespace
