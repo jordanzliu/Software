@@ -67,7 +67,7 @@ while test $# -gt 0; do
             # Find all the files that we want to format, and pass them to
             # clang-format as arguments
             # We remove the last -o flag from the extension string
-            find $CURR_DIR/../src/ ${EXTENSION_STRING::-2} \
+            find $CURR_DIR/../src/ -path "$CURR_DIR/../src/thunderbots/software/DOSL/*" -prune ${EXTENSION_STRING::-2} \
                 | xargs $CURR_DIR/clang-format-$CLANG_VERSION -i -style=file
 
             shift

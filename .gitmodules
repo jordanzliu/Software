@@ -1,0 +1,3 @@
+[submodule "src/thunderbots/software/DOSL"]
+	path = src/thunderbots/software/DOSL
+	url = git@github.com:jordanzliu/DOSL.git
