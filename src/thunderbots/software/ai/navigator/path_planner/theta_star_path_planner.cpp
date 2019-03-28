@@ -4,16 +4,26 @@
 
 namespace
 {
+    bool intersectsAny(const Segment &seg, const std::vector<Obstacle> obstacles)
+    {
+        for (const auto &obstacle : obstacles)
+        {
+            if (obstacle.getBoundaryPolygon())
+        }
+    }
+
     using cost_type = double;
 
     class PointNode : public ThetaStar::Node<PointNode, cost_type>
     {
-    public:
-        PointNode():_point(){};
-        explicit PointNode(const Point &point) : _point(point),
-        ThetaStar::Node<PointNode, cost_type>(){};
+       public:
+        PointNode() : _point(){};
+        explicit PointNode(const Point &point)
+            : _point(point), ThetaStar::Node<PointNode, cost_type>(){};
 
-        bool operator==(const PointNode &other)
+        ~PointNode() = default;
+
+        bool operator==(const PointNode &other) const
         {
             return _point == other._point;
         }
@@ -23,20 +33,28 @@ namespace
             return _point;
         }
 
-        ~PointNode() = default;
-
        private:
         const Point _point;
     };
 
-    class Planner : public ThetaStar::Algorithm<PointNode, double>
+    class ThetaStarSearch : public ThetaStar::Algorithm<PointNode, double>
     {
        public:
-        ~Planner() = default;
-        explicit Planner(const Point &dest) : dest_node(dest){};
+        ~ThetaStarSearch() override = default;
+        explicit ThetaStarSearch(const Point &dest, std::vector<Obstacle> &&_obstacles)
+            : dest_node(dest), obstacles(std::move(_obstacles)){};
+
+        void getSuccessors(PointNode &node, std::vector<PointNode> *neighbours,
+                           std::vector<cost_type> *neighbour_costs) override
+        {
+            for (const auto &obstacle : obstacles)
+            {
+            }
+        }
 
        private:
         const PointNode dest_node;
+        const std::vector<Obstacle> obstacles;
     };
 }  // namespace
 

@@ -15,20 +15,21 @@
 // placeholder obstacle with robot radius factor = 1
 TEST(NavigatorPlaceholderObstacleTest, default_placeholder_obstacle_polygon)
 {
-    double ROOT_THREE_BY_TWO = 0.86602540378;
+    double ROOT_THREE_BY_TWO = std::sqrt(3) / 2;
     Timestamp current_time   = Timestamp::fromSeconds(123);
     Robot robot = Robot(3, Point(1, 1), Vector(-0.3, 0), Angle::ofRadians(2.2),
                         AngularVelocity::ofRadians(-0.6), current_time);
-    Polygon pg  = PlaceholderObstacle::getBoundaryPolygon(robot, 1.0, 3.0);
+    PlaceholderObstacle ob  = PlaceholderObstacle(1.0);
+    Polygon pg = ob.getBoundaryPolygon();
     Point pt0   = Point(ROBOT_MAX_RADIUS_METERS, 0);
-    Point pt1   = Point(-ROBOT_MAX_RADIUS_METERS, 0);
-    Point pt2 =
-        Point(ROBOT_MAX_RADIUS_METERS / 2.0, ROBOT_MAX_RADIUS_METERS * ROOT_THREE_BY_TWO);
-    Point pt3 = Point(-ROBOT_MAX_RADIUS_METERS / 2.0,
+    Point pt1 =
+            Point(ROBOT_MAX_RADIUS_METERS / 2.0, ROBOT_MAX_RADIUS_METERS * ROOT_THREE_BY_TWO);
+    Point pt2 = Point(-ROBOT_MAX_RADIUS_METERS / 2.0,
                       ROBOT_MAX_RADIUS_METERS * ROOT_THREE_BY_TWO);
-    Point pt4 = Point(ROBOT_MAX_RADIUS_METERS / 2.0,
+    Point pt3   = Point(-ROBOT_MAX_RADIUS_METERS, 0);
+    Point pt4 = Point(-ROBOT_MAX_RADIUS_METERS / 2.0,
                       -ROBOT_MAX_RADIUS_METERS * ROOT_THREE_BY_TWO);
-    Point pt5 = Point(-ROBOT_MAX_RADIUS_METERS / 2.0,
+    Point pt5 = Point(ROBOT_MAX_RADIUS_METERS / 2.0,
                       -ROBOT_MAX_RADIUS_METERS * ROOT_THREE_BY_TWO);
     EXPECT_EQ(pg.getPoints().size(), 6);
     EXPECT_EQ(pg.getPoints()[0], pt0);
@@ -43,21 +44,23 @@ TEST(NavigatorPlaceholderObstacleTest, default_placeholder_obstacle_polygon)
 TEST(NavigatorPlaceholderObstacleTest, expanded_placeholder_obstacle_polygon)
 {
     double EXPANSION         = 1.4;
-    double ROOT_THREE_BY_TWO = 0.86602540378;
+    double ROOT_THREE_BY_TWO = std::sqrt(3) / 2;
     Timestamp current_time   = Timestamp::fromSeconds(123);
     Robot robot = Robot(3, Point(1, 1), Vector(-0.3, 0), Angle::ofRadians(2.2),
                         AngularVelocity::ofRadians(-0.6), current_time);
-    Polygon pg  = PlaceholderObstacle::getBoundaryPolygon(robot, EXPANSION, 3.0);
+    PlaceholderObstacle ob  = PlaceholderObstacle(EXPANSION);
+    Polygon pg = ob.getBoundaryPolygon();
     Point pt0   = Point(ROBOT_MAX_RADIUS_METERS * EXPANSION, 0);
-    Point pt1   = Point(-ROBOT_MAX_RADIUS_METERS * EXPANSION, 0);
-    Point pt2   = Point(ROBOT_MAX_RADIUS_METERS * EXPANSION / 2.0,
-                      ROBOT_MAX_RADIUS_METERS * EXPANSION * ROOT_THREE_BY_TWO);
-    Point pt3   = Point(-ROBOT_MAX_RADIUS_METERS * EXPANSION / 2.0,
-                      ROBOT_MAX_RADIUS_METERS * EXPANSION * ROOT_THREE_BY_TWO);
-    Point pt4   = Point(ROBOT_MAX_RADIUS_METERS * EXPANSION / 2.0,
+    Point pt1   = Point(ROBOT_MAX_RADIUS_METERS * EXPANSION / 2.0,
+                        ROBOT_MAX_RADIUS_METERS * EXPANSION * ROOT_THREE_BY_TWO);
+    Point pt2   = Point(-ROBOT_MAX_RADIUS_METERS * EXPANSION / 2.0,
+                        ROBOT_MAX_RADIUS_METERS * EXPANSION * ROOT_THREE_BY_TWO);
+    Point pt3   = Point(-ROBOT_MAX_RADIUS_METERS * EXPANSION, 0);
+    Point pt4   = Point(-ROBOT_MAX_RADIUS_METERS * EXPANSION / 2.0,
+                        -ROBOT_MAX_RADIUS_METERS * EXPANSION * ROOT_THREE_BY_TWO);
+    Point pt5   = Point(ROBOT_MAX_RADIUS_METERS * EXPANSION / 2.0,
                       -ROBOT_MAX_RADIUS_METERS * EXPANSION * ROOT_THREE_BY_TWO);
-    Point pt5   = Point(-ROBOT_MAX_RADIUS_METERS * EXPANSION / 2.0,
-                      -ROBOT_MAX_RADIUS_METERS * EXPANSION * ROOT_THREE_BY_TWO);
+
     EXPECT_EQ(pg.getPoints().size(), 6);
     EXPECT_EQ(pg.getPoints()[0], pt0);
     EXPECT_EQ(pg.getPoints()[1], pt1);
@@ -71,20 +74,21 @@ TEST(NavigatorPlaceholderObstacleTest, expanded_placeholder_obstacle_polygon)
 TEST(NavigatorPlaceholderObstacleTest, contracted_placeholder_obstacle_polygon)
 {
     double CONTRACTION       = .7;
-    double ROOT_THREE_BY_TWO = 0.86602540378;
+    double ROOT_THREE_BY_TWO = std::sqrt(3) / 2;
     Timestamp current_time   = Timestamp::fromSeconds(123);
     Robot robot = Robot(3, Point(1, 1), Vector(-0.3, 0), Angle::ofRadians(2.2),
                         AngularVelocity::ofRadians(-0.6), current_time);
-    Polygon pg  = PlaceholderObstacle::getBoundaryPolygon(robot, CONTRACTION, 3.0);
+    PlaceholderObstacle ob(CONTRACTION);
+    Polygon pg  = ob.getBoundaryPolygon();
     Point pt0   = Point(ROBOT_MAX_RADIUS_METERS * CONTRACTION, 0);
-    Point pt1   = Point(-ROBOT_MAX_RADIUS_METERS * CONTRACTION, 0);
-    Point pt2   = Point(ROBOT_MAX_RADIUS_METERS * CONTRACTION / 2.0,
-                      ROBOT_MAX_RADIUS_METERS * CONTRACTION * ROOT_THREE_BY_TWO);
-    Point pt3   = Point(-ROBOT_MAX_RADIUS_METERS * CONTRACTION / 2.0,
-                      ROBOT_MAX_RADIUS_METERS * CONTRACTION * ROOT_THREE_BY_TWO);
-    Point pt4   = Point(ROBOT_MAX_RADIUS_METERS * CONTRACTION / 2.0,
-                      -ROBOT_MAX_RADIUS_METERS * CONTRACTION * ROOT_THREE_BY_TWO);
-    Point pt5   = Point(-ROBOT_MAX_RADIUS_METERS * CONTRACTION / 2.0,
+    Point pt1   = Point(ROBOT_MAX_RADIUS_METERS * CONTRACTION / 2.0,
+                        ROBOT_MAX_RADIUS_METERS * CONTRACTION * ROOT_THREE_BY_TWO);
+    Point pt2   = Point(-ROBOT_MAX_RADIUS_METERS * CONTRACTION / 2.0,
+                        ROBOT_MAX_RADIUS_METERS * CONTRACTION * ROOT_THREE_BY_TWO);
+    Point pt3   = Point(-ROBOT_MAX_RADIUS_METERS * CONTRACTION, 0);
+    Point pt4   = Point(-ROBOT_MAX_RADIUS_METERS * CONTRACTION / 2.0,
+                        -ROBOT_MAX_RADIUS_METERS * CONTRACTION * ROOT_THREE_BY_TWO);
+    Point pt5   = Point(ROBOT_MAX_RADIUS_METERS * CONTRACTION / 2.0,
                       -ROBOT_MAX_RADIUS_METERS * CONTRACTION * ROOT_THREE_BY_TWO);
     EXPECT_EQ(pg.getPoints().size(), 6);
     EXPECT_EQ(pg.getPoints()[0], pt0);

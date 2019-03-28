@@ -24,6 +24,6 @@ class Obstacle
      *
      * @return a six-sided Polygon to represent the boundary around the obstacle
      */
-    static Polygon getBoundaryPolygon(const Robot& robot, double robot_radius_scaling,
-                                      double velocity_projection_scaling);
+    virtual const Polygon& getBoundaryPolygon() const = 0;
+    virtual ~Obstacle() = default;
 };
