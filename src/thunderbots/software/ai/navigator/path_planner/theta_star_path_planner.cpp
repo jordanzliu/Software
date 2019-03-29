@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "ai/navigator/path_planner/theta_star_path_planner.h"
 
 #include <dosl/dosl>
@@ -43,8 +45,8 @@ namespace
     {
        public:
         ~ThetaStarSearch() override = default;
-        explicit ThetaStarSearch(const Point &dest, std::vector<Obstacle> &&_obstacles)
-            : dest_node(dest), obstacles(std::move(_obstacles)){};
+        explicit ThetaStarSearch(const Point& start, const Point &dest, std::vector<Obstacle> _obstacles)
+            : start_node(start), dest_node(dest), obstacles(std::move(_obstacles)){};
 
         void getSuccessors(PointNode &node, std::vector<PointNode> *neighbours,
                            std::vector<cost_type> *neighbour_costs) override
@@ -69,8 +71,18 @@ namespace
             }
         }
 
-       private:
+        std::vector<PointNode> getStartNodes() override {
+            return {start_node};
+        }
+
+        bool stopSearch(PointNode& node) override {
+            return node == dest_node;
+        }
+
         const PointNode dest_node;
+
+       private:
+        const PointNode start_node;
         const std::vector<Obstacle> obstacles;
     };
 }  // namespace
@@ -80,5 +92,13 @@ std::optional<std::vector<Point>> ThetaStarPathPlanner::findPath(
     const Point &start, const Point &dest, const std::vector<Obstacle> &obstacles,
     const ViolationFunction &violation_function)
 {
-    return std::nullopt;
+    ThetaStarSearch search(start, dest, obstacles);
+    search.search();
+    std::vector<PointNode*> ptr_node_path = search.reconstructPointerPath(search.dest_node);
+    std::vector<Point> path(ptr_node_path.size());
+    std::transform(ptr_node_path.begin(), ptr_node_path.end(), std::back_inserter(path),
+            [](const PointNode* const pn) {
+                return pn->point();
+    });
+    return path;
 }
