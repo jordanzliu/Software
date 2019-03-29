@@ -6,18 +6,19 @@
 
 namespace
 {
-    inline const bool intersectsAny(const Segment &seg, const std::vector<Obstacle>& obstacles)
+    using cost_type = double;
+    using obstacle_ptr = std::unique_ptr<Obstacle>;
+
+    inline const bool intersectsAny(const Segment &seg, const std::vector<obstacle_ptr>& obstacles)
     {
         for (const auto &obstacle : obstacles)
         {
-            if (obstacle.getBoundaryPolygon().intersects(seg)) {
+            if (obstacle->getBoundaryPolygon().intersects(seg)) {
                 return false;
             }
         }
         return true;
     }
-
-    using cost_type = double;
 
     class PointNode : public ThetaStar::Node<PointNode, cost_type>
     {
@@ -45,7 +46,7 @@ namespace
     {
        public:
         ~ThetaStarSearch() override = default;
-        explicit ThetaStarSearch(const Point& start, const Point &dest, std::vector<Obstacle> _obstacles)
+        explicit ThetaStarSearch(const Point& start, const Point &dest, std::vector<obstacle_ptr>&& _obstacles)
             : start_node(start), dest_node(dest), obstacles(std::move(_obstacles)){};
 
         void getSuccessors(PointNode &node, std::vector<PointNode> *neighbours,
@@ -55,9 +56,9 @@ namespace
             // polygon that returns the distance of the point furthest from the mean of the points
             // so that we can cull polygons that have no chance to intersect
             for (const auto& obstacle : obstacles) {
-                for (const auto& point : obstacle.getBoundaryPolygon().getPoints()) {
+                for (const auto& point : obstacle->getBoundaryPolygon().getPoints()) {
                     if (node.point() == point) continue;
-                    if (!intersectsAny(Segment{node.point(), point}, obstacles)) {
+                    if (!intersectsAny(Segment(node.point(), point), obstacles)) {
                         neighbours->emplace_back(PointNode(point));
                         neighbour_costs->emplace_back(dist(node.point(), point));
                     }
@@ -83,16 +84,16 @@ namespace
 
        private:
         const PointNode start_node;
-        const std::vector<Obstacle> obstacles;
+        const std::vector<obstacle_ptr> obstacles;
     };
 }  // namespace
 
 
 std::optional<std::vector<Point>> ThetaStarPathPlanner::findPath(
-    const Point &start, const Point &dest, const std::vector<Obstacle> &obstacles,
+    const Point &start, const Point &dest, std::vector<std::unique_ptr<Obstacle>>&& obstacles,
     const ViolationFunction &violation_function)
 {
-    ThetaStarSearch search(start, dest, obstacles);
+    ThetaStarSearch search(start, dest, std::move(obstacles));
     search.search();
     std::vector<PointNode*> ptr_node_path = search.reconstructPointerPath(search.dest_node);
     std::vector<Point> path(ptr_node_path.size());

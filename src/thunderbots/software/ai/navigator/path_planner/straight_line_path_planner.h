@@ -18,6 +18,6 @@ class StraightLinePathPlanner : public PathPlanner
      * @return a vector that is {start, dest}
      */
     std::optional<std::vector<Point>> findPath(
-        const Point &start, const Point &dest, const std::vector<Obstacle> &obstacles,
+        const Point &start, const Point &dest, std::vector<std::unique_ptr<Obstacle>> &&obstacles,
         const ViolationFunction &violation_function) override;
 };

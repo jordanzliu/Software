@@ -1,6 +1,7 @@
 #pragma once
 #include <optional>
 #include <vector>
+#include <memory>
 
 #include "ai/navigator/obstacle/obstacle.h"
 #include "geom/point.h"
@@ -36,7 +37,7 @@ class PathPlanner
      * @return
      */
     virtual std::optional<std::vector<Point>> findPath(
-        const Point &start, const Point &dest, const std::vector<Obstacle> &obstacles,
+        const Point &start, const Point &dest, std::vector<std::unique_ptr<Obstacle>> &&obstacles,
         const ViolationFunction &violation_function) = 0;
     virtual ~PathPlanner()                           = default;
 };
