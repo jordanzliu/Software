@@ -105,7 +105,7 @@ Obstacle Obstacle::createRobotObstacleFromPositionAndRadiusAndVelocity(
 }
 
 // this is a helper function
-double Obstacle::getRadiusCushionForHexagon(double radius)
+double Obstacle::getRadiusForHexagon(double radius)
 {
     // return radius cushion so that centre to side distance is at least double given
     // radius so that two robots can pass by each other this is accomplished by doubling

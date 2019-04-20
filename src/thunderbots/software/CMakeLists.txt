@@ -72,6 +72,9 @@ if(NOT G3LOG OR NOT EXISTS "${G3LOG}")
 endif()
 message("g3log path: ${G3LOG}")
 
+# "Find" DOSL, a path planning library
+SET(DOSL_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/DOSL)
+
 # Find boost components
 find_package(Boost REQUIRED COMPONENTS
         coroutine
@@ -115,6 +118,7 @@ include_directories(
         ${catkin_INCLUDE_DIRS}
         ${PROTOBUF_INCLUDE_DIRS}
         ${Boost_INCLUDE_DIRS}
+        ${DOSL_INCLUDE_DIRS}
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         )
