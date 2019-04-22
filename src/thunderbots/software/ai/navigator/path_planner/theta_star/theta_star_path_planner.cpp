@@ -29,17 +29,26 @@ namespace {
         std::vector<PointNode> getStartNodes() override;
 
         /**
-         * This function returns the nodes reachable from a given node, as well as
+         * This function returns the nodes adjacent to given node, as well as
          * the cost associated with each node.
          *
          * @param node The node we are currently at
-         * @param successors a pointer to a vector of PointNodes that are reachable from
+         * @param successors a pointer to a vector of PointNodes that are adjecent to
          *                  the current node
          * @param successor_costs a pointer to a vector of costs corresponding to the above
          *                          nodes
          */
         void getSuccessors(PointNode& node, std::vector<PointNode>* successors,
                             std::vector<cost_type>* successor_costs) override;
+        /**
+         * Returns true if the line segment {node1, node2} does not intersect an
+         * obstacle.
+         * @param node1 first node
+         * @param node2 2nd node
+         * @param cost (out parameter) distance between the two nodes
+         * @return true if {node1, node2} doesn't intersect anything
+         */
+        bool isSegmentFree(PointNode& node1, PointNode& node2, cost_type* cost) override;
 
         /**
          * Returns true if we are at the destination.
@@ -49,8 +58,6 @@ namespace {
         bool stopSearch(PointNode& node) override;
 
         const PointNode& destinationNode() {return dest_node;};
-
-        virtual ~ThetaStarSearch() = default;
 
     private:
         const PointNode start_node, dest_node;
@@ -65,37 +72,20 @@ namespace {
 
     void ThetaStarSearch::getSuccessors(PointNode &node, std::vector<PointNode> *successors,
                                         std::vector<cost_type> *successor_costs) {
-
-        // draw a line segment from the current point to each obstacle vertex,
-        // and add it to successors if it doesn't intersect anything else
-        for (const Obstacle& ob : *obstacles) {
-            for (const Point& point : ob.getBoundaryPolygon().getPoints()) {
-                Segment seg = Segment{node.point(), point};
-
-                // O(n^2) w.r.t points unfortunately
-                // TODO: potentially create a centre and radius for polygons
-                // as a heuristic for whether to check intersection or not
-
-                for (const Obstacle& ob2 : *obstacles) {
-                    for (const Segment& seg2 : ob2.getBoundaryPolygon().getSegments()) {
-                        if (!intersects(seg, seg2)) {
-                            // the segment from the current node to the point "point"
-                            // does not intersect line segments in any obstacle,
-                            // add it to successors
-                            // TODO: add violation cost to the cost
-                            successors->emplace_back(PointNode(point));
-                            // cost is euclidian distance
-                            successor_costs->emplace_back(dist(node.point(), point));
-                        }
-                    }
-                }
-            }
-        }
+        // TODO: add nodes that are on the same parent polygon, and are on the same
+        // line segment as `node`
     }
+
 
     bool ThetaStarSearch::stopSearch(PointNode &node)
     {
         return node == dest_node;
+    }
+
+    bool ThetaStarSearch::isSegmentFree(PointNode &node1, PointNode &node2, cost_type *cost) {
+        // TODO: replace this with a function that checks if the line segment
+        // between node1 and node2 intersects anything
+        return Algorithm::isSegmentFree(node1, node2, cost);
     }
 }
 
@@ -104,7 +94,7 @@ ThetaStarPathPlanner::findPath(const Point &start, const Point &dest, const std:
                                const ViolationFunction &violation_function) {
     ThetaStarSearch search(start, dest, obstacles);
     search.search();
-
+    // TODO: figure out if the search failed to find a path, and return nullopt
     std::vector<PointNode*> node_path = search.reconstructPointerPath(search.destinationNode());
 
     std::vector<Point> point_path;

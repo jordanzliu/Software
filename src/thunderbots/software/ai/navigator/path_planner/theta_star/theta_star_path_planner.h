@@ -3,6 +3,7 @@
 
 class ThetaStarPathPlanner : public PathPlanner {
 public:
+    ThetaStarPathPlanner() = default;
     std::optional<std::vector<Point>> findPath(
             const Point &start, const Point &dest, const std::vector<Obstacle> &obstacles,
             const ViolationFunction &violation_function) override;

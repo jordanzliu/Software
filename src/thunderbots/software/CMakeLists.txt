@@ -872,6 +872,52 @@ if (CATKIN_ENABLE_TESTING)
             ${G3LOG}
             )
 
+    catkin_add_gtest(theta_star_path_planner_test
+            test/ai/navigator/path_planner/theta_star_path_planner.cpp
+            ai/navigator/path_planner/theta_star/theta_star_path_planner.cpp
+            ai/intent/catch_intent.cpp
+            ai/intent/chip_intent.cpp
+            ai/intent/direct_velocity_intent.cpp
+            ai/intent/direct_wheels_intent.cpp
+            ai/intent/dribble_intent.cpp
+            ai/intent/intent.cpp
+            ai/intent/kick_intent.cpp
+            ai/intent/move_intent.cpp
+            ai/intent/movespin_intent.cpp
+            ai/intent/pivot_intent.cpp
+            ai/intent/stop_intent.cpp
+            ai/navigator/placeholder_navigator/placeholder_navigator.cpp
+            ai/primitive/catch_primitive.cpp
+            ai/primitive/chip_primitive.cpp
+            ai/primitive/direct_velocity_primitive.cpp
+            ai/primitive/direct_wheels_primitive.cpp
+            ai/primitive/dribble_primitive.cpp
+            ai/primitive/kick_primitive.cpp
+            ai/primitive/move_primitive.cpp
+            ai/primitive/movespin_primitive.cpp
+            ai/primitive/pivot_primitive.cpp
+            ai/primitive/primitive.cpp
+            ai/primitive/stop_primitive.cpp
+            ai/world/ball.cpp
+            ai/world/field.cpp
+            ai/world/game_state.cpp
+            ai/world/robot.cpp
+            ai/world/team.cpp
+            ai/world/world.cpp
+            util/parameter/dynamic_parameter_utils.cpp
+            util/parameter/dynamic_parameters.cpp
+            util/time/duration.cpp
+            util/time/time.cpp
+            util/time/timestamp.cpp
+            geom/polygon.cpp
+            geom/util.cpp
+            ai/navigator/obstacle/obstacle.cpp
+            )
+    target_link_libraries(theta_star_path_planner_test
+            ${catkin_LIBRARIES}
+            ${G3LOG}
+            )
+
 endif()
 
 ##### ROSTests / Integration Tests #####
