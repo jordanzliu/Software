@@ -23,7 +23,7 @@ private:
 
 template<class ProtobufMessage>
 void ProtoLogger<ProtobufMessage>::onValueReceived(ProtobufMessage val) {
-    if (val.SerializeToOstream(&output_file_stream))
+    if (!val.SerializeToOstream(&output_file_stream))
     {
         throw std::string("Failed to log protobuf to file");
     } else {
