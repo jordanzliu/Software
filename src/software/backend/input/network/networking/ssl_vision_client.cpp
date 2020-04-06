@@ -49,6 +49,7 @@ void SSLVisionClient::handleDataReception(const boost::system::error_code& error
         packet_data.ParseFromArray(raw_received_data_.data(),
                                    static_cast<int>(num_bytes_received));
         handle_function(packet_data);
+        sendValueToObservers(packet_data);
 
         // Once we've handled the data, start listening again
         socket_.async_receive_from(

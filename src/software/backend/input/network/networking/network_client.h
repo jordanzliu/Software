@@ -10,6 +10,7 @@
 #include "software/parameter/config.hpp"
 #include "software/proto/messages_robocup_ssl_wrapper.pb.h"
 #include "software/proto/ssl_referee.pb.h"
+#include "software/replay/proto_logger.h"
 #include "software/world/world.h"
 
 /**
@@ -155,4 +156,6 @@ class NetworkClient
 
     std::shared_ptr<const RefboxConfig> refbox_config;
     std::shared_ptr<const CameraConfig> camera_config;
+
+    std::shared_ptr<ProtoLogger<SSL_WrapperPacket>> ssl_wrapper_proto_logger;
 };

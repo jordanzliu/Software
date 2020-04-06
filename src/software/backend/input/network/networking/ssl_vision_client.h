@@ -4,9 +4,10 @@
 #include <boost/bind.hpp>
 #include <string>
 
+#include "software/multithreading/subject.h"
 #include "software/proto/messages_robocup_ssl_wrapper.pb.h"
 
-class SSLVisionClient
+class SSLVisionClient : public Subject<SSL_WrapperPacket>
 {
    public:
     /**

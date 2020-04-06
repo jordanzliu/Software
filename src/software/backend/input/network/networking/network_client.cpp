@@ -21,7 +21,8 @@ NetworkClient::NetworkClient(std::string vision_multicast_address,
       initial_packet_count(0),
       received_world_callback(received_world_callback),
       refbox_config(refbox_config),
-      camera_config(camera_config)
+      camera_config(camera_config),
+      ssl_wrapper_proto_logger(new ProtoLogger<SSL_WrapperPacket>("test.protolog"))
 {
     setupVisionClient(vision_multicast_address, vision_multicast_port);
 
@@ -39,6 +40,7 @@ void NetworkClient::setupVisionClient(std::string vision_address, int vision_por
         ssl_vision_client = std::make_unique<SSLVisionClient>(
             io_service, vision_address, vision_port,
             boost::bind(&NetworkClient::filterAndPublishVisionDataWrapper, this, _1));
+        ssl_vision_client->Subject<SSL_WrapperPacket>::registerObserver(ssl_wrapper_proto_logger);
     }
     catch (const boost::exception& ex)
     {
