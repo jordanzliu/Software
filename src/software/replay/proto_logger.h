@@ -25,6 +25,7 @@ template<class ProtobufMessage>
 void ProtoLogger<ProtobufMessage>::onValueReceived(ProtobufMessage val) {
     if (!val.SerializeToOstream(&output_file_stream))
     {
+        LOG(INFO) << "FUCK";
         throw std::string("Failed to log protobuf to file");
     } else {
         LOG(INFO) << "Logged a protobuf message";

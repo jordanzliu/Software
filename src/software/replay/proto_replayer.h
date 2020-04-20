@@ -1,7 +1,8 @@
-#pragma once
+#pragma oncel
 #include <fstream>
 #include <google/protobuf/message.h>
 #include "software/multithreading/subject.h"
+#include "software/logger/init.h"
 
 template <typename ProtobufMessage>
 class ProtoReplayer : public Subject<ProtobufMessage>
@@ -11,17 +12,28 @@ class ProtoReplayer : public Subject<ProtobufMessage>
 public:
     ProtoReplayer() = delete;
     explicit ProtoReplayer(const std::string& filename);
-    void start() {is_running = true;}
-    void stop() {is_running = false;}
+    void runOnce();
 
 private:
-    std::ifstream file_stream;
-    bool is_running;
+    std::ifstream file_ifstream;
 };
 
 template<typename ProtobufMessage>
-ProtoReplayer<ProtobufMessage>::ProtoReplayer(const std::string &filename) {
+ProtoReplayer<ProtobufMessage>::ProtoReplayer(const std::string &filename)
+: file_ifstream(filename) {}
 
+
+template <typename ProtobufMessage>
+void ProtoReplayer<ProtobufMessage>::runOnce()
+{
+    ProtobufMessage message;
+    if (!message.ParseFromIstream(&file_ifstream))
+    {
+        LOG(INFO) << "FUCK";
+        throw std::string("Failed to parse message from istream!");
+    }
+    else
+    {
+        this->sendValueToObservers(message);
+    }
 }
-
-
