@@ -1,0 +1,22 @@
+syntax = "proto3";
+import "shared/proto/geometry.proto";
+
+message Polynomial1dMsg {
+    repeated double coeffs = 1;
+}
+
+message Polynomial2dMsg {
+    Polynomial1dMsg x_poly = 1;
+    Polynomial1dMsg y_poly = 2;
+}
+
+message SplineSegment2dMsg {
+    double start_val = 1;
+    double end_val = 2;
+    Polynomial2dMsg polynomial = 3;
+}
+
+message Spline2dMsg {
+    repeated TbotsProto.Point knots = 1;
+    repeated SplineSegment2dMsg spline_segments = 2;
+}

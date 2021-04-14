@@ -61,6 +61,17 @@ proto_library(
     ],
 )
 
+proto_library(
+    name = "spline_msg_proto",
+    srcs = [
+        "spline_msg.proto",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        "//shared/proto:tbots_proto",
+    ],
+)
+
 cc_proto_library(
     name = "ssl_cc_proto",
     deps = [":ssl_proto"],
@@ -86,6 +97,11 @@ cc_proto_library(
     deps = [":repeated_any_msg_proto"],
 )
 
+cc_proto_library(
+    name = "spline_msg_cc_proto",
+    deps = [":spline_msg_proto"],
+)
+
 py_proto_library(
     name = "software_py_proto",
     srcs = [
@@ -95,6 +111,7 @@ py_proto_library(
         "repeated_any_msg.proto",
         "replay_msg.proto",
         "sensor_msg.proto",
+        "spline_msg.proto",
         "ssl_gc_common.proto",
         "ssl_gc_game_event.proto",
         "ssl_gc_geometry.proto",

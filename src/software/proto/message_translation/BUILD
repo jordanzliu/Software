@@ -179,3 +179,16 @@ cc_test(
         "@gtest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "spline",
+    srcs = ["spline.cpp"],
+    hdrs = ["spline.h"],
+    deps = [
+        "//software/geom:polynomial1d",
+        "//software/geom:polynomial2d",
+        "//software/geom:spline2d",
+        "//software/proto:spline_msg_cc_proto",
+        "//software/proto/message_translation:tbots_geometry",
+    ],
+)
