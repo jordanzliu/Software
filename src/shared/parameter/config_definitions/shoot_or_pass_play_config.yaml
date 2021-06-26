@@ -17,6 +17,6 @@
 
 - bool:
     name: enable_shoot_or_chip
-    value: false
+    value: true
     description: >-
         Enable shoot or chip instead of shoot or play.
