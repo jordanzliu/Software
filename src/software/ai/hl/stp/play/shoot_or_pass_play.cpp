@@ -23,7 +23,8 @@ ShootOrPassPlay::ShootOrPassPlay(std::shared_ptr<const PlayConfig> config)
 
 bool ShootOrPassPlay::isApplicable(const World &world) const
 {
-    return world.gameState().isPlaying() &&
+    return !play_config->getShootOrPassPlayConfig()->getEnableShootOrChip()->value() &&
+            world.gameState().isPlaying() &&
            (world.getTeamWithPossession() == TeamSide::FRIENDLY ||
             world.getTeamWithPossessionConfidence() < 1.0);
 }

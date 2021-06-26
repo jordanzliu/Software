@@ -24,7 +24,10 @@ bool ShootOrChipPlay::isApplicable(const World &world) const
     // we keep it around and
     //       maintain it so as to have a backup if passing become unreliable for whatever
     //       reason
-    return false;
+    return play_config->getShootOrPassPlayConfig()->getEnableShootOrChip()->value() &&
+           world.gameState().isPlaying() &&
+           (world.getTeamWithPossession() == TeamSide::FRIENDLY ||
+            world.getTeamWithPossessionConfidence() < 1.0);
 }
 
 bool ShootOrChipPlay::invariantHolds(const World &world) const
@@ -46,15 +49,17 @@ void ShootOrChipPlay::getNextTactics(TacticCoroutine::push_type &yield,
      *   robot, it will chip to right in front of the robot in the largest open free area
      */
 
-    std::array<std::shared_ptr<CreaseDefenderTactic>, 2> crease_defender_tactics = {
+    std::array<std::shared_ptr<CreaseDefenderTactic>, 3> crease_defender_tactics = {
+        std::make_shared<CreaseDefenderTactic>(
+            play_config->getRobotNavigationObstacleConfig()),
         std::make_shared<CreaseDefenderTactic>(
             play_config->getRobotNavigationObstacleConfig()),
         std::make_shared<CreaseDefenderTactic>(
             play_config->getRobotNavigationObstacleConfig()),
     };
 
-    std::array<std::shared_ptr<MoveTactic>, 2> move_to_open_area_tactics = {
-        std::make_shared<MoveTactic>(true), std::make_shared<MoveTactic>(true)};
+    std::array<std::shared_ptr<MoveTactic>, 1> move_to_open_area_tactics = {
+        std::make_shared<MoveTactic>(true)};
 
     // Figure out where the fallback chip target is
     // Experimentally determined to be a reasonable value
@@ -77,8 +82,12 @@ void ShootOrChipPlay::getNextTactics(TacticCoroutine::push_type &yield,
         result[0].emplace_back(std::get<0>(crease_defender_tactics));
         std::get<1>(crease_defender_tactics)
             ->updateControlParams(world.ball().position(),
-                                  CreaseDefenderAlignment::RIGHT);
+                                  CreaseDefenderAlignment::CENTRE);
         result[0].emplace_back(std::get<1>(crease_defender_tactics));
+        std::get<2>(crease_defender_tactics)
+            ->updateControlParams(world.ball().position(),
+                                  CreaseDefenderAlignment::RIGHT);
+        result[0].emplace_back(std::get<2>(crease_defender_tactics));
 
         // Update tactics moving to open areas
         std::vector<Point> enemy_robot_points;
