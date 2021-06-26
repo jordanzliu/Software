@@ -34,7 +34,7 @@ struct AttackerFSM
         using namespace boost::sml;
 
         const auto pivot_kick_s = state<PivotKickFSM>;
-        const auto keep_away_s  = state<DribbleFSM>;
+        // const auto keep_away_s  = state<DribbleFSM>;
         const auto update_e     = event<Update>;
 
         /**
@@ -112,54 +112,54 @@ struct AttackerFSM
          * @param event AttackerFSM::Update event
          * @param processEvent processes the DribbleFSM::Update
          */
-        const auto keep_away = [](auto event,
-                                  back::process<DribbleFSM::Update> processEvent) {
-            // ball possession is threatened, get into a better position to take the
-            // best pass so far
-            DribbleFSM::ControlParams control_params;
+        // const auto keep_away = [](auto event,
+        //                           back::process<DribbleFSM::Update> processEvent) {
+        //     // ball possession is threatened, get into a better position to take the
+        //     // best pass so far
+        //     DribbleFSM::ControlParams control_params;
 
-            auto best_pass_so_far = Pass(event.common.robot.position(),
-                                         event.common.world.field().enemyGoalCenter(),
-                                         BALL_MAX_SPEED_METERS_PER_SECOND);
+        //     auto best_pass_so_far = Pass(event.common.robot.position(),
+        //                                  event.common.world.field().enemyGoalCenter(),
+        //                                  BALL_MAX_SPEED_METERS_PER_SECOND);
 
-            if (event.control_params.best_pass_so_far)
-            {
-                best_pass_so_far = *event.control_params.best_pass_so_far;
-            }
-            else
-            {
-                // TODO too spammy, re-enable when fixed
-                // we didn't get a best_pass_so_far, so we will be using the default pass.
-                // LOG(INFO) << "Attacker FSM has no best pass so far, using default pass
-                // "
-                //           << "to enemy goal center.";
-            }
+        //     if (event.control_params.best_pass_so_far)
+        //     {
+        //         best_pass_so_far = *event.control_params.best_pass_so_far;
+        //     }
+        //     else
+        //     {
+        //         // TODO too spammy, re-enable when fixed
+        //         // we didn't get a best_pass_so_far, so we will be using the default pass.
+        //         // LOG(INFO) << "Attacker FSM has no best pass so far, using default pass
+        //         // "
+        //         //           << "to enemy goal center.";
+        //     }
 
-            auto keepaway_dribble_dest =
-                findKeepAwayTargetPoint(event.common.world, best_pass_so_far);
+        //     auto keepaway_dribble_dest =
+        //         findKeepAwayTargetPoint(event.common.world, best_pass_so_far);
 
-            const auto& enemy_team = event.common.world.enemyTeam();
-            const auto& ball       = event.common.world.ball();
+        //     const auto& enemy_team = event.common.world.enemyTeam();
+        //     const auto& ball       = event.common.world.ball();
 
-            auto final_dribble_orientation = best_pass_so_far.passerOrientation();
+        //     auto final_dribble_orientation = best_pass_so_far.passerOrientation();
 
-            if (enemy_team.numRobots() > 0)
-            {
-                // there is a robot on the enemy team, face away from the nearest one
-                auto nearest_enemy_robot =
-                    *enemy_team.getNearestRobot(event.common.robot.position());
-                auto dribble_orientation_vec =
-                    ball.position() - nearest_enemy_robot.position();
-                final_dribble_orientation = dribble_orientation_vec.orientation();
-            }
+        //     if (enemy_team.numRobots() > 0)
+        //     {
+        //         // there is a robot on the enemy team, face away from the nearest one
+        //         auto nearest_enemy_robot =
+        //             *enemy_team.getNearestRobot(event.common.robot.position());
+        //         auto dribble_orientation_vec =
+        //             ball.position() - nearest_enemy_robot.position();
+        //         final_dribble_orientation = dribble_orientation_vec.orientation();
+        //     }
 
-            control_params = {.dribble_destination       = keepaway_dribble_dest,
-                              .final_dribble_orientation = final_dribble_orientation,
-                              .allow_excessive_dribbling = false};
+        //     control_params = {.dribble_destination       = keepaway_dribble_dest,
+        //                       .final_dribble_orientation = final_dribble_orientation,
+        //                       .allow_excessive_dribbling = false};
 
 
-            processEvent(DribbleFSM::Update(control_params, event.common));
-        };
+        //     processEvent(DribbleFSM::Update(control_params, event.common));
+        // };
 
         /**
          * Guard that checks if the ball should be kicked, which is when there's a nearby
@@ -170,36 +170,37 @@ struct AttackerFSM
          * @return if the ball should be kicked
          */
         // TODO: revisit this, we shouldn't "panic chip" unless we're completely boxed in!
-        const auto should_kick = [](auto event) {
-            Polygon inflated_friendly_defense_area =
-                static_cast<Polygon>(event.common.world.field().friendlyDefenseArea())
-                    .expand(1.5);
-            if (contains(inflated_friendly_defense_area, event.common.robot.position()))
-            {
-                return true;
-            }
+        // const auto should_kick = [](auto event) {
+        //     Polygon inflated_friendly_defense_area =
+        //         static_cast<Polygon>(event.common.world.field().friendlyDefenseArea())
+        //             .expand(1.5);
+        //     if (contains(inflated_friendly_defense_area, event.common.robot.position()))
+        //     {
+        //         return true;
+        //     }
 
-            // check for enemy threat
-            Circle about_to_steal_danger_zone(event.common.robot.position(),
-                                              event.control_params.attacker_tactic_config
-                                                  ->getEnemyAboutToStealBallRadius()
-                                                  ->value());
-            for (const auto& enemy : event.common.world.enemyTeam().getAllRobots())
-            {
-                if (contains(about_to_steal_danger_zone, enemy.position()))
-                {
-                    LOG(DEBUG) << "Attacker Chipping: NOT a chip pass";
-                    return true;
-                }
-            }
-            // otherwise check for shot or pass committed
-            return event.control_params.pass_committed || event.control_params.shot;
-        };
+        //     // check for enemy threat
+        //     Circle about_to_steal_danger_zone(event.common.robot.position(),
+        //                                       event.control_params.attacker_tactic_config
+        //                                           ->getEnemyAboutToStealBallRadius()
+        //                                           ->value());
+        //     for (const auto& enemy : event.common.world.enemyTeam().getAllRobots())
+        //     {
+        //         if (contains(about_to_steal_danger_zone, enemy.position()))
+        //         {
+        //             LOG(DEBUG) << "Attacker Chipping: NOT a chip pass";
+        //             return true;
+        //         }
+        //     }
+        //     // otherwise check for shot or pass committed
+        //     return event.control_params.pass_committed || event.control_params.shot;
+        // };
 
         return make_transition_table(
             // src_state + event [guard] / action = dest_state
-            *keep_away_s + update_e[should_kick] / pivot_kick = pivot_kick_s,
-            keep_away_s + update_e[!should_kick] / keep_away,
-            pivot_kick_s + update_e / pivot_kick, pivot_kick_s = X);
+            // disable keepaway
+            // *keep_away_s + update_e[should_kick] / pivot_kick = pivot_kick_s,
+            // keep_away_s + update_e[!should_kick] / keep_away,
+            *pivot_kick_s + update_e / pivot_kick, pivot_kick_s = X);
     }
 };
