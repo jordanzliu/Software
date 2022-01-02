@@ -35,6 +35,12 @@
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
+
+PYBIND_DEPS = [
+    "@local_config_python//:python_headers",
+    "@pybind11",
+]
 
 licenses(["notice"])
 
@@ -128,6 +134,30 @@ cc_library(
     ],
     includes = ["."],
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "RVOPybindLib",
+    srcs = [
+        "RVOPybind.cpp",
+    ],
+    copts = ["-fexceptions"],
+    features = [
+        "-use_header_modules",
+        "-parse_headers",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":RVO",
+    ] + PYBIND_DEPS,
+)
+
+pybind_extension(
+    name = "RVOPybind",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":RVOPybindLib",
+    ],
 )
 
 pkg_tar(

@@ -24,6 +24,7 @@ PYTHON_BINDINGS = [
     "//software/python_bindings:passing.so",
     "//software/python_bindings:world.so",
     "//software/python_bindings:keep_away.so",
+    "//extlibs/rvo2/src:RVOPybind.so",
 ]
 
 py_test(
