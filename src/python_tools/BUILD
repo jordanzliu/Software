@@ -10,6 +10,7 @@ NOTEBOOK_DEPS = [
     requirement("bokeh"),
     requirement("ipywidgets"),
     requirement("jupytext"),
+    requirement("do-mpc"),
     ":proto_log",
     ":sensor_proto_log",
     "//python_tools/plotting:plot_heatmap",
