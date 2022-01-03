@@ -118,8 +118,8 @@ pkg_tar(
     deps = [
         ":doc",
         ":pkgconfig",
-        "//src:include",
-        "//src:lib",
+        "//extlibs/rvo2/src:include",
+        "//extlibs/rvo2/src:lib",
     ],
 )
 

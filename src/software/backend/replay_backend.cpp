@@ -71,7 +71,7 @@ void ReplayBackend::continuouslyPullFromReplayFiles()
         // condition again
         std::this_thread::sleep_for(CHECK_LAST_PRIMITIVE_TIME_DURATION);
     }
-    std::exit(0);
+    std::terminate();
 }
 
 // Register this backend in the genericFactory

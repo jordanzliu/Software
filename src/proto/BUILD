@@ -12,11 +12,13 @@ proto_library(
         "primitive.proto",
         "robot_log_msg.proto",
         "robot_status_msg.proto",
+        "ssl_wrapper_and_velocity_info.proto",
         "tbots_software_msgs.proto",
         "tbots_timestamp_msg.proto",
         "vision.proto",
     ],
     deps = [
+        ":ssl_proto",
         "@nanopb//:nanopb_options_proto",
     ],
 )
@@ -185,6 +187,7 @@ py_proto_library(
         "ssl_gc_game_event.proto",
         "ssl_gc_geometry.proto",
         "ssl_gc_referee_message.proto",
+        "ssl_wrapper_and_velocity_info.proto",
     ],
     deps = [
         ":tbots_py_proto",

@@ -5,6 +5,7 @@
 #include "proto/messages_robocup_ssl_detection.pb.h"
 #include "proto/messages_robocup_ssl_geometry.pb.h"
 #include "proto/messages_robocup_ssl_wrapper.pb.h"
+#include "proto/ssl_wrapper_and_velocity_info.pb.h"
 #include "software/world/world.h"
 
 /**
@@ -30,4 +31,15 @@ std::unique_ptr<SSLProto::SSL_WrapperPacket> createSSLWrapperPacket(
  * @return A WrapperPacket containing the given data.
  */
 std::unique_ptr<SSLProto::SSL_WrapperPacket> createSSLWrapperPacket(
+    const World& world, TeamColour friendly_team_colour);
+
+/**
+ * Creates a WrapperPacket from the given world state
+ *
+ * @param world the World to fill the WrapperPacket data from
+ * @param friendly_team_colour_yellow whether the friendly team is yellow
+ *
+ * @return A WrapperPacket containing the given data.
+ */
+std::unique_ptr<TbotsProto::SSLWrapperAndVelocityInfo> createSSLWrapperAndVelocityInfo(
     const World& world, TeamColour friendly_team_colour);

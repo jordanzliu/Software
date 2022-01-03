@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package TbotsProto;
+
+import "proto/messages_robocup_ssl_wrapper.proto";
+import "proto/geometry.proto";
+
+message VelocityInfo
+{
+    map<uint32, Vector> yellow_robot_velocities = 1;
+    map<uint32, Vector> blue_robot_velocities   = 2;
+}
+
+message SSLWrapperAndVelocityInfo
+{
+    SSLProto.SSL_WrapperPacket ssl_wrapper = 1;
+    VelocityInfo velocity_info             = 2;
+}

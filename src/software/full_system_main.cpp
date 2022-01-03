@@ -7,6 +7,7 @@
 #include "proto/logging/proto_logger.h"
 #include "proto/message_translation/ssl_wrapper.h"
 #include "proto/play_info_msg.pb.h"
+#include "proto/ssl_wrapper_and_velocity_info.pb.h"
 #include "shared/parameter/cpp_dynamic_parameters.h"
 #include "software/ai/threaded_ai.h"
 #include "software/backend/backend.h"
@@ -170,14 +171,14 @@ int main(int argc, char** argv)
 
             auto world_to_ssl_wrapper_conversion_fn =
                 [friendly_team_colour](const World& world) {
-                    return *createSSLWrapperPacket(world, friendly_team_colour);
+                    return *createSSLWrapperAndVelocityInfo(world, friendly_team_colour);
                 };
 
             auto vision_logger =
-                std::make_shared<ProtoLogger<SSLProto::SSL_WrapperPacket>>(
-                    proto_log_output_dir / "SensorFusion_SSL_WrapperPacket");
+                std::make_shared<ProtoLogger<TbotsProto::SSLWrapperAndVelocityInfo>>(
+                    proto_log_output_dir / "SensorFusion_SSLWrapperAndVelocityInfo");
             auto world_to_vision_adapter = std::make_shared<
-                ObserverSubjectAdapter<World, SSLProto::SSL_WrapperPacket>>(
+                ObserverSubjectAdapter<World, TbotsProto::SSLWrapperAndVelocityInfo>>(
                 world_to_ssl_wrapper_conversion_fn);
             sensor_fusion->registerObserver(world_to_vision_adapter);
             world_to_vision_adapter->registerObserver(vision_logger);

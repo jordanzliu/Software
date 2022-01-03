@@ -12,12 +12,17 @@ PYBIND11_MODULE(RVOPybind, m)
         .def("x", &RVO::Vector2::x)
         .def("y", &RVO::Vector2::y);
     py::class_<RVO::RVOSimulator>(m, "RVOSimulator")
-        .def(py::init<float, float, size_t, float, float, float, float, RVO::Vector2>(),
+        .def(py::init<float, float, size_t, float, float, float, float>(),
              py::arg("timeStep"), py::arg("neighborDist"), py::arg("maxNeighbors"),
              py::arg("timeHorizon"), py::arg("timeHorizonObst"), py::arg("radius"),
-             py::arg("maxSpeed"), py::arg("velocity"))
+             py::arg("maxSpeed"))
         .def("addAgent",
-             pybind11::overload_cast<const RVO::Vector2&>(&RVO::RVOSimulator::addAgent))
+             pybind11::overload_cast<const RVO::Vector2&, float, size_t, float, float,
+                                     float, float, const RVO::Vector2&>(
+                 &RVO::RVOSimulator::addAgent),
+             py::arg("position"), py::arg("neighborDist"), py::arg("maxNeighbors"),
+             py::arg("timeHorizon"), py::arg("timeHorizonObst"), py::arg("radius"),
+             py::arg("maxSpeed"), py::arg("velocity"))
         .def(
             "getAgentORCALines",
             [](const RVO::RVOSimulator& rvoSimulator, size_t agentNo) {
