@@ -1,5 +1,7 @@
 #include <pybind11/pybind11.h>
 
+#include <sstream>
+
 #include "extlibs/rvo2/src/RVO.h"
 #include "extlibs/rvo2/src/Vector2.h"
 
@@ -10,7 +12,12 @@ PYBIND11_MODULE(RVOPybind, m)
     py::class_<RVO::Vector2>(m, "Vector2")
         .def(py::init<float, float>())
         .def("x", &RVO::Vector2::x)
-        .def("y", &RVO::Vector2::y);
+        .def("y", &RVO::Vector2::y)
+        .def("__repr__", [](const RVO::Vector2& vector) {
+            std::stringstream s;
+            s << '[' << vector.x() << ", " << vector.y() << ']';
+            return s.str();
+        });
     py::class_<RVO::RVOSimulator>(m, "RVOSimulator")
         .def(py::init<float, float, size_t, float, float, float, float>(),
              py::arg("timeStep"), py::arg("neighborDist"), py::arg("maxNeighbors"),
