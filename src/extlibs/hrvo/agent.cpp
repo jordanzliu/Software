@@ -25,7 +25,7 @@ Agent::Agent(HRVOSimulator *simulator, const Vector &position, float radius,
     updateRadiusFromVelocity();
 }
 
-void Agent::update()
+void Agent::update(float delta_time)
 {
     if (new_velocity_.length() >= max_speed_)
     {
@@ -36,7 +36,8 @@ void Agent::update()
     const auto curr_path_point = path.getCurrentPathPoint();
     if (curr_path_point.has_value() && path.isGoingToFinalPathPoint())
     {
-        double dist_to_destination = (curr_path_point.value().getPosition() - position_).length();
+        double dist_to_destination =
+            (curr_path_point.value().getPosition() - position_).length();
         if (dist_to_destination < start_decel_dist)
         {
             velocity_ = new_velocity_.normalize(dist_to_destination);
@@ -44,11 +45,11 @@ void Agent::update()
         }
     }
 
-//    double max_allowed_delta_v = 1000000;
-//    if (dv.length() < max_allowed_delta_v || dv.length() == 0.f)
+    //    double max_allowed_delta_v = 1000000;
+    //    if (dv.length() < max_allowed_delta_v || dv.length() == 0.f)
 
     const Vector dv = new_velocity_ - velocity_;
-    if (dv.length() < max_accel_ * simulator_->getTimeStep() || dv.length() == 0.f)
+    if (dv.length() < max_accel_ * delta_time || dv.length() == 0.f)
     {
         velocity_ = new_velocity_;
     }
@@ -56,11 +57,11 @@ void Agent::update()
     {
         // Calculate the maximum velocity towards the preferred velocity, given the
         // acceleration constraint
-//        velocity_ = velocity_ + (max_allowed_delta_v) * (dv / dv.length());
-        velocity_ = velocity_ + (max_accel_ * simulator_->getTimeStep()) * (dv / dv.length());
+        //        velocity_ = velocity_ + (max_allowed_delta_v) * (dv / dv.length());
+        velocity_ = velocity_ + (max_accel_ * delta_time) * (dv / dv.length());
     }
 
-    position_ += velocity_ * simulator_->time_step;
+    position_ += velocity_ * delta_time;
 
     Vector current_dest;
 
@@ -180,5 +181,6 @@ TeamSide Agent::getAgentType()
 void Agent::updateRadiusFromVelocity()
 {
     // Linearly increase radius based on the current agent velocity
-    radius_ = min_radius_ + max_radius_inflation_ * std::min(1.0, 3 * velocity_.length() / max_speed_);
+    radius_ = min_radius_ +
+              max_radius_inflation_ * std::min(1.0, 3 * velocity_.length() / max_speed_);
 }

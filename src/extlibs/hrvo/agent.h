@@ -41,7 +41,7 @@ class Agent
     /**
      * Computes the new velocity of this agent.
      */
-    virtual void computeNewVelocity() = 0;
+    virtual void computeNewVelocity(float delta_time) = 0;
 
     /**
      * Create the velocity obstacle which other_agent should see for this Agent
@@ -59,7 +59,7 @@ class Agent
     /**
      * Updates the position and velocity of this agent.
      */
-    virtual void update();
+    virtual void update(float delta_time);
 
     /**
      * Returns the current position of the agent

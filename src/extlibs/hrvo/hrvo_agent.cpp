@@ -41,10 +41,10 @@
 #include "software/geom/algorithms/intersection.h"
 #include "software/geom/vector.h"
 
-HRVOAgent::HRVOAgent(HRVOSimulator *simulator, const Vector &position, float max_neighbor_dist,
-                     std::size_t maxNeighbors, float radius, float max_radius_inflation,
-                     const Vector &velocity, float maxAccel, AgentPath &path,
-                     float maxSpeed, RobotId robot_id, TeamSide type)
+HRVOAgent::HRVOAgent(HRVOSimulator *simulator, const Vector &position,
+                     float max_neighbor_dist, std::size_t maxNeighbors, float radius,
+                     float max_radius_inflation, const Vector &velocity, float maxAccel,
+                     AgentPath &path, float maxSpeed, RobotId robot_id, TeamSide type)
     : Agent(simulator, position, radius, max_radius_inflation, velocity, velocity,
             maxSpeed, maxAccel, path, robot_id, type),
       maxNeighbors_(maxNeighbors),
@@ -58,7 +58,7 @@ HRVOAgent::HRVOAgent(HRVOSimulator *simulator, const Vector &position, float max
 }
 
 void HRVOAgent::updatePrimitive(const TbotsProto::Primitive &new_primitive,
-                                const World &world)
+                                const World &world, float delta_time)
 {
     AgentPath path;
     static_obstacles.clear();
@@ -80,7 +80,7 @@ void HRVOAgent::updatePrimitive(const TbotsProto::Primitive &new_primitive,
 
         // Max distance which the robot can travel in one time step + scaling
         // TODO (#2370): This constant is calculated multiple times.
-        float path_radius = (max_speed_ * simulator_->getTimeStep()) / 2;
+        float path_radius = (max_speed_ * delta_time) / 2;
         auto path_points  = {PathPoint(
             Vector(destination.x_meters(), destination.y_meters()), speed_at_dest)};
         path              = AgentPath(path_points, path_radius);
@@ -223,11 +223,11 @@ VelocityObstacle HRVOAgent::createVelocityObstacle(const Agent &other_agent)
     return VelocityObstacle(hrvo_apex, vo.getLeftSide(), vo.getRightSide());
 }
 
-void HRVOAgent::computeNewVelocity()
+void HRVOAgent::computeNewVelocity(float delta_time)
 {
     // Based on The Hybrid Reciprocal Velocity Obstacle paper:
     // https://gamma.cs.unc.edu/HRVO/HRVO-T-RO.pdf
-    computePreferredVelocity();
+    computePreferredVelocity(delta_time);
     computeVelocityObstacles();
 
     // Find candidate velocities which this agent can take to avoid collision
@@ -557,7 +557,7 @@ std::optional<int> HRVOAgent::findIntersectingVelocityObstacle(
     return std::nullopt;
 }
 
-void HRVOAgent::computePreferredVelocity()
+void HRVOAgent::computePreferredVelocity(float delta_time)
 {
     auto path_point_opt = path.getCurrentPathPoint();
 
@@ -592,7 +592,7 @@ void HRVOAgent::computePreferredVelocity()
 
         // Limit the preferred velocity to the kinematic limits
         const Vector dv = ideal_pref_velocity - velocity_;
-        if (dv.length() <= max_accel_ * simulator_->getTimeStep())
+        if (dv.length() <= max_accel_ * delta_time)
         {
             pref_velocity_ = ideal_pref_velocity;
         }
@@ -600,18 +600,16 @@ void HRVOAgent::computePreferredVelocity()
         {
             // Calculate the maximum velocity towards the preferred velocity, given the
             // acceleration constraint
-            pref_velocity_ =
-                velocity_ + dv.normalize(max_accel_ * simulator_->getTimeStep());
+            pref_velocity_ = velocity_ + dv.normalize(max_accel_ * delta_time);
         }
     }
     else
     {
         // Accelerate to preferred speed
         // v_pref = v_now + a * t
-        float currPrefSpeed =
-            std::min(static_cast<double>(prefSpeed_),
-                     velocity_.length() + max_accel_ * simulator_->getTimeStep());
-        pref_velocity_ = distVectorToGoal.normalize(currPrefSpeed);
+        float currPrefSpeed = std::min(static_cast<double>(prefSpeed_),
+                                       velocity_.length() + max_accel_ * delta_time);
+        pref_velocity_      = distVectorToGoal.normalize(currPrefSpeed);
     }
 }
 

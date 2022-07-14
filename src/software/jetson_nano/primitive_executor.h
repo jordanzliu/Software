@@ -58,7 +58,7 @@ class PrimitiveExecutor
      * @returns DirectPerWheelControl The per-wheel direct control primitive msg
      */
     std::unique_ptr<TbotsProto::DirectControlPrimitive> stepPrimitive(
-        const unsigned int robot_id, const RobotState& robot_state);
+        const unsigned int robot_id, const RobotState& robot_state, float delta_time_s);
 
    private:
     /*

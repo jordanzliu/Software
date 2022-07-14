@@ -35,7 +35,7 @@ class LinearVelocityAgent : public Agent
     /**
      * Computes the new velocity of this agent.
      */
-    void computeNewVelocity() override;
+    void computeNewVelocity(float delta_time) override;
 
     /**
      * Create the velocity obstacle which other_agent should see for this Agent

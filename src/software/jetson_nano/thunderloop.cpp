@@ -49,6 +49,7 @@ void Thunderloop::runLoop()
     struct timespec iteration_time;
     struct timespec last_primitive_received_time;
     struct timespec current_time;
+    struct timespec last_primitive_step_time;
 
     // Input buffer
     TbotsProto::PrimitiveSet new_primitive_set;
@@ -179,11 +180,25 @@ void Thunderloop::runLoop()
                 auto friendly_team = Team(world_.friendly_team());
                 auto robot         = friendly_team.getRobotById(robot_id_);
 
+                // time since last primitive step
+                struct timespec time_since_last_primitive_step;
+                ScopedTimespecTimer::timespecDiff(&current_time,
+                                                  &last_primitive_step_time,
+                                                  &time_since_last_primitive_step);
+                float seconds_elapsed_since_last_primitive_step =
+                    static_cast<float>(time_since_last_primitive_step.tv_sec) +
+                    static_cast<float>(result.tv_nsec /
+                                       static_cast<int>(NANOSECONDS_PER_SECOND));
+                // clamp the maximum time to avoid overly long timesteps and their
+                // associated unintended consequences
+                float delta_time =
+                    std::max(0.01f, seconds_elapsed_since_last_primitive_step);
+
                 if (robot.has_value())
                 {
                     // TODO-JON needs to use world in primitive executor
                     direct_control_ = *primitive_executor_.stepPrimitive(
-                        robot_id_, robot->currentState());
+                        robot_id_, robot->currentState(), delta_time);
                 }
                 else
                 {
@@ -191,9 +206,11 @@ void Thunderloop::runLoop()
                     auto robot_state =
                         RobotState(Point(0, 0), Vector(0, 0), Angle::fromDegrees(0),
                                    Angle::fromDegrees(0));
-                    direct_control_ =
-                        *primitive_executor_.stepPrimitive(robot_id_, robot_state);
+                    direct_control_ = *primitive_executor_.stepPrimitive(
+                        robot_id_, robot_state, delta_time);
                 }
+                // update last primitive step timestamp
+                clock_gettime(CLOCK_MONOTONIC, &last_primitive_step_time);
             }
 
             thunderloop_status_.set_primitive_executor_step_time_ns(

@@ -55,7 +55,7 @@ class HRVOSimulator
      * robot
      * @param friendly_team_colour The colour of the friendly team
      */
-    explicit HRVOSimulator(float time_step, const RobotConstants_t &robot_constants,
+    explicit HRVOSimulator(const RobotConstants_t &robot_constants,
                            const TeamColour friendly_team_colour);
 
     /**
@@ -66,7 +66,7 @@ class HRVOSimulator
      *
      * @param world The world which the simulation should be based upon
      */
-    void updateWorld(const World &world);
+    void updateWorld(const World &world, float delta_time);
 
     /**
      * Reset all friendly agents goal points to match the path of the given primitive set
@@ -83,7 +83,7 @@ class HRVOSimulator
      *
      * @return    The index of the agent.
      */
-    std::size_t addHRVORobotAgent(const Robot &robot, TeamSide type);
+    std::size_t addHRVORobotAgent(const Robot &robot, TeamSide type, float delta_time);
 
     /**
      *      Adds a new Linear Velocity Agent to the simulation based on Robot.
@@ -94,7 +94,7 @@ class HRVOSimulator
      * @return    The index of the agent.
      */
     std::size_t addLinearVelocityRobotAgent(const Robot &robot, const Vector &destination,
-                                            TeamSide type);
+                                            TeamSide type, float delta_time);
 
     /**
      *      Adds a new agent to the simulation.
@@ -116,10 +116,11 @@ class HRVOSimulator
      * @param type 	 	 			Whether this robot is FRIENDLY or ENEMY
      * @return The index of the agent.
      */
-    std::size_t addHRVOAgent(const Vector &position, float agent_radius, float max_radius_inflation,
-                             const Vector &curr_velocity, float maxSpeed, float maxAccel, AgentPath &path,
-                             float neighborDist, std::size_t maxNeighbors, RobotId robot_id, TeamSide type,
-                             float start_decel_dist);
+    std::size_t addHRVOAgent(const Vector &position, float agent_radius,
+                             float max_radius_inflation, const Vector &curr_velocity,
+                             float maxSpeed, float maxAccel, AgentPath &path,
+                             float neighborDist, std::size_t maxNeighbors,
+                             RobotId robot_id, TeamSide type, float start_decel_dist);
 
     /**
      * Add a new LinearlyVelocityAgent
@@ -145,7 +146,7 @@ class HRVOSimulator
      * of each agent, and the progress of each towards its goal by moving
      * the simulation time_step seconds forward
      */
-    void doStep();
+    void doStep(float delta_time);
 
     /**
      * Get the current friendly robot velocity
@@ -256,16 +257,6 @@ class HRVOSimulator
     }
 
     /**
-     *   Returns the time step of the simulation.
-     *
-     * @return The present time step of the simulation.
-     */
-    float getTimeStep() const
-    {
-        return time_step;
-    }
-
-    /**
      *   Returns the progress towards their goals of all agents.
      *
      * @return True if all agents have reached their goals; false otherwise.
@@ -287,9 +278,6 @@ class HRVOSimulator
 
     // The global time of this hrvo simulation
     float global_time;
-
-    // The amount of time which the simulator should advance by
-    const float time_step;
 
     // True if all agents have reached their destination
     bool reached_goals;

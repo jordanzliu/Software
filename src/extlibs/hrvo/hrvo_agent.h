@@ -77,7 +77,7 @@ class HRVOAgent : public Agent
     /**
      * Computes the new velocity of this agent.
      */
-    void computeNewVelocity() override;
+    void computeNewVelocity(float delta_time) override;
 
     /**
      * Create the hybrid reciprocal velocity obstacle which other_agent should see for
@@ -98,7 +98,7 @@ class HRVOAgent : public Agent
     /**
      * Computes the preferred velocity of this agent.
      */
-    void computePreferredVelocity();
+    void computePreferredVelocity(float delta_time);
 
     /**
      * Inserts a neighbor into the set of neighbors of this agent.
@@ -114,7 +114,8 @@ class HRVOAgent : public Agent
      * @param new_primitive The new primitive to pursue
      * @param world The world in which the new primitive is being pursued
      */
-    void updatePrimitive(const TbotsProto::Primitive &new_primitive, const World &world);
+    void updatePrimitive(const TbotsProto::Primitive &new_primitive, const World &world,
+                         float delta_time);
 
     /**
      * Get a list of circles which represent the new velocity candidates

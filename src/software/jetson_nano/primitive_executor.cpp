@@ -13,9 +13,9 @@ PrimitiveExecutor::PrimitiveExecutor(const double time_step,
                                      const TeamColour friendly_team_colour)
     : current_primitive_(),
       robot_constants_(robot_constants),
-      hrvo_simulator_(static_cast<float>(time_step), robot_constants,
-                      friendly_team_colour)
+      hrvo_simulator_(robot_constants, friendly_team_colour)
 {
+    (void)time_step;
 }
 
 void PrimitiveExecutor::updatePrimitiveSet(
@@ -38,7 +38,9 @@ void PrimitiveExecutor::clearCurrentPrimitive()
 void PrimitiveExecutor::updateWorld(const TbotsProto::World& world_msg)
 {
     current_world_ = world_msg;
-    hrvo_simulator_.updateWorld(World(world_msg));
+    // updateWorld uses the timestep to estimate reachability within a tick. use an upper
+    // bound of 2 times the loop frequency.
+    hrvo_simulator_.updateWorld(World(world_msg), 2.0f / CONTROL_LOOP_HZ);
 }
 
 void PrimitiveExecutor::updateLocalVelocity(Vector local_velocity) {}
@@ -78,11 +80,9 @@ AngularVelocity PrimitiveExecutor::getTargetAngularVelocity(
     // angular velocity given linear deceleration and distance remaining to target
     // orientation.
     // Vi = sqrt(0^2 + 2 * a * d)
-    double deceleration_angular_speed = std::sqrt(
-            2 * max_accel * delta_orientation);
+    double deceleration_angular_speed = std::sqrt(2 * max_accel * delta_orientation);
 
-    double max_angular_speed =
-            static_cast<double>(max_speed);
+    double max_angular_speed  = static_cast<double>(max_speed);
     double next_angular_speed = std::min(max_angular_speed, deceleration_angular_speed);
 
     const double signed_delta_orientation =
@@ -179,9 +179,9 @@ Vector PrimitiveExecutor::getTargetLinearVelocity(
 
 
 std::unique_ptr<TbotsProto::DirectControlPrimitive> PrimitiveExecutor::stepPrimitive(
-    const unsigned int robot_id, const RobotState& robot_state)
+    const unsigned int robot_id, const RobotState& robot_state, float delta_time_s)
 {
-    hrvo_simulator_.doStep();
+    hrvo_simulator_.doStep(delta_time_s);
 
     // Visualize the HRVO Simulator for the current robot
     hrvo_simulator_.visualize(robot_id);

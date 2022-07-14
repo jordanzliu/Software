@@ -10,7 +10,7 @@ LinearVelocityAgent::LinearVelocityAgent(HRVOSimulator *simulator, const Vector 
 {
 }
 
-void LinearVelocityAgent::computeNewVelocity()
+void LinearVelocityAgent::computeNewVelocity(float delta_time)
 {
     // TODO (#2496): Fix bug where LinearVelocityAgents go past their destination
     // Preferring a velocity which points directly towards goal
@@ -33,7 +33,7 @@ void LinearVelocityAgent::computeNewVelocity()
     }
 
     const Vector dv = pref_velocity_ - velocity_;
-    if (dv.length() <= max_accel_ * simulator_->getTimeStep())
+    if (dv.length() <= max_accel_ * delta_time)
     {
         new_velocity_ = pref_velocity_;
     }
@@ -41,7 +41,7 @@ void LinearVelocityAgent::computeNewVelocity()
     {
         // Calculate the maximum velocity towards the preferred velocity, given the
         // acceleration constraint
-        new_velocity_ = velocity_ + dv.normalize(max_accel_ * simulator_->getTimeStep());
+        new_velocity_ = velocity_ + dv.normalize(max_accel_ * delta_time);
     }
 }
 
