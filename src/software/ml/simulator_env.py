@@ -1,4 +1,5 @@
 import gymnasium as gym
+import numpy.random
 from gymnasium import spaces
 import numpy as np
 from enum import IntEnum
@@ -161,46 +162,51 @@ class SimulatorGymEnv(gym.Env):
         x_min, x_max, y_min, y_max = self._get_enemy_goal_area(ssl_wrapper.geometry)
         return x_min <= ball_x <= x_max and y_min <= ball_y <= y_max
 
-    def _compute_reward(self, ssl_wrapper):
+    def _position_reward(self, ssl_wrapper):
+        """Ball position reward (0 to 1) based on field position"""
+        if not ssl_wrapper or not ssl_wrapper.detection or not ssl_wrapper.geometry:
+            return 0.0
+
+        if not ssl_wrapper.detection.balls:
+            return 0.0
+
+        ball = ssl_wrapper.detection.balls[0]
+        ball_x = ball.x / 1000
+
+        field_length = ssl_wrapper.geometry.field.field_length / 1000
+        friendly_goal_x = -field_length / 2
+        enemy_goal_x = field_length / 2
+
+        position_reward = (ball_x - friendly_goal_x) / (enemy_goal_x - friendly_goal_x)
+        return max(0.0, min(1.0, position_reward))
+
+    def _goal_reward(self, ssl_wrapper):
+        """Goal area reward (10 if ball in enemy goal)"""
+        return 10.0 if self._is_ball_in_enemy_goal(ssl_wrapper) else 0.0
+
+    def _distance_reward(self, ssl_wrapper):
+        """Distance-based reward (0 to 0.1) for robot proximity to ball"""
         if not ssl_wrapper or not ssl_wrapper.detection:
             return 0.0
 
-        # Get ball position
-        ball_x, ball_y = 0.0, 0.0
-        if ssl_wrapper.detection.balls:
-            ball = ssl_wrapper.detection.balls[0]
-            ball_x, ball_y = ball.x / 1000, ball.y / 1000
+        if not ssl_wrapper.detection.balls or not ssl_wrapper.detection.robots_yellow:
+            return 0.0
 
-        # Get friendly robot position
-        friendly_x, friendly_y = 0.0, 0.0
-        if ssl_wrapper.detection.robots_yellow:
-            robot = ssl_wrapper.detection.robots_yellow[0]
-            friendly_x, friendly_y = robot.x / 1000, robot.y / 1000
+        ball = ssl_wrapper.detection.balls[0]
+        robot = ssl_wrapper.detection.robots_yellow[0]
 
-        reward = 0.0
+        ball_x, ball_y = ball.x / 1000, ball.y / 1000
+        robot_x, robot_y = robot.x / 1000, robot.y / 1000
 
-        # Position-based reward (0 to 1)
-        if ssl_wrapper.geometry:
-            field_length = ssl_wrapper.geometry.field.field_length / 1000
-            friendly_goal_x = -field_length / 2
-            enemy_goal_x = field_length / 2
+        distance = np.sqrt((robot_x - ball_x) ** 2 + (robot_y - ball_y) ** 2)
+        return max(0.0, 0.1 * (1.0 - distance / 1.0))
 
-            # Linear interpolation from friendly goal (0) to enemy goal (1)
-            position_reward = (ball_x - friendly_goal_x) / (
-                enemy_goal_x - friendly_goal_x
-            )
-            position_reward = max(0.0, min(1.0, position_reward))
-            reward += position_reward
-
-            # Goal area reward (10 if ball in enemy goal)
-            if self._is_ball_in_enemy_goal(ssl_wrapper):
-                reward += 10.0
-
-        # Distance-based reward (0 to 0.1)
-        distance = np.sqrt((friendly_x - ball_x) ** 2 + (friendly_y - ball_y) ** 2)
-        distance_reward = max(0.0, 0.1 * (1.0 - distance / 1.0))
-        reward += distance_reward
-        return reward
+    def _compute_reward(self, ssl_wrapper):
+        return (
+            self._position_reward(ssl_wrapper)
+            + self._goal_reward(ssl_wrapper)
+            + self._distance_reward(ssl_wrapper) * 1000
+        )
 
     def reset(self, seed=None, options=None):
         if self.simulator is not None:
@@ -233,9 +239,22 @@ class SimulatorGymEnv(gym.Env):
         print("simulator is alive")
 
         # Reset the world by sending a WorldState to simulator_io
-        blue_bots = [tbots_cpp.Point(1, 0)]
-        yellow_bots = [tbots_cpp.Point(-1, 0)]
-        ball_initial_pos = tbots_cpp.Point(0, 0)
+        blue_bots = [
+            tbots_cpp.Point(
+                numpy.random.uniform(low=1, high=2),
+                numpy.random.uniform(low=-1, high=1),
+            )
+        ]
+        yellow_bots = [
+            tbots_cpp.Point(
+                numpy.random.uniform(low=-2, high=-1),
+                numpy.random.uniform(low=-1, high=1),
+            )
+        ]
+        ball_initial_pos = tbots_cpp.Point(
+            numpy.random.uniform(low=-0.5, high=0.5),
+            numpy.random.uniform(low=-0.5, high=0.5),
+        )
 
         self.simulator_io.send_proto(
             WorldState,

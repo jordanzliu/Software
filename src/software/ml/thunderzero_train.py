@@ -16,8 +16,8 @@ def train():
     )
     vec_env = make_vec_env(create_sim_env, n_envs=2)
     model = PPO("MlpPolicy", vec_env, verbose=1)
-    model.learn(total_timesteps=100_000)
-    model.save("thunderzero_model")
+    model.learn(total_timesteps=10_000)
+    model.save(f"{path}/thunderzero_model.ckpt")
 
     # do one rollout for rendering
     env = SimulatorGymEnv(f"{path}/sim_rundir")
@@ -38,6 +38,7 @@ def train():
             break
 
     video_writer.release()
+    print(f"output video saved in {path}")
 
 
 if __name__ == "__main__":
