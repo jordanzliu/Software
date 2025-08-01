@@ -45,7 +45,6 @@ class Simulator:
         :return: simulator context managed instance
         """
         # Setup unix socket directory
-        print("launching simulator")
         try:
             os.makedirs(self.simulator_runtime_dir)
         except:
@@ -89,7 +88,7 @@ gdb --args bazel-bin/{simulator_command}
                     time.sleep(1)
         else:
             self.er_force_simulator_proc = Popen(simulator_command.split(" "))
-        print("launched simulator")
+
         return self
 
     def __exit__(self, type, value, traceback) -> None:

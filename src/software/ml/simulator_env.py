@@ -204,7 +204,7 @@ class SimulatorGymEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         if self.simulator is not None:
-            self.simulator.__exit__()
+            self.simulator.__exit__(None, None, None)
 
         self.simulator = Simulator(
             self.simulator_runtime_dir, enable_realism=self.enable_realism
@@ -252,12 +252,12 @@ class SimulatorGymEnv(gym.Env):
         return self._get_obs(self.ssl_wrapper), {}
 
     def step(self, action):
-        self.ssl_wrapper = self.ssl_wrapper_buffer.get(block=True, return_cached=False)
-        obs = self._get_obs(self.ssl_wrapper)
         primitive_set = self._convert_action_to_primitive_set(action)
         self.yellow_io.send_proto(PrimitiveSet, primitive_set)
         tick = SimulatorTick(milliseconds=100)
         self.simulator_io.send_proto(SimulatorTick, tick)
+        self.ssl_wrapper = self.ssl_wrapper_buffer.get(block=True, return_cached=False)
+        obs = self._get_obs(self.ssl_wrapper)
         reward = self._compute_reward(self.ssl_wrapper)
         terminated = self._is_ball_in_enemy_goal(self.ssl_wrapper)
         truncated = False
@@ -302,14 +302,14 @@ class SimulatorGymEnv(gym.Env):
             ax.add_patch(center_circle)
 
             # Goal areas
-            goal_area_depth = field.goal_area_depth / 1000
-            goal_area_width = field.goal_area_width / 1000
+            goal_area_depth = field.goal_depth / 1000
+            goal_area_width = field.goal_width / 1000
 
             # Left goal area
             left_goal_area = patches.Rectangle(
                 (-field_length / 2, -goal_area_width / 2),
-                goal_area_depth,
-                goal_area_width,
+                goal_depth,
+                goal_width,
                 linewidth=2,
                 edgecolor="white",
                 facecolor="none",
@@ -319,8 +319,8 @@ class SimulatorGymEnv(gym.Env):
             # Right goal area
             right_goal_area = patches.Rectangle(
                 (field_length / 2 - goal_area_depth, -goal_area_width / 2),
-                goal_area_depth,
-                goal_area_width,
+                goal_depth,
+                goal_width,
                 linewidth=2,
                 edgecolor="white",
                 facecolor="none",
@@ -389,8 +389,9 @@ class SimulatorGymEnv(gym.Env):
         ax.axis("off")
 
         fig.canvas.draw()
-        buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        buf = buf.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+        buf = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
+        buf = buf.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+        buf = buf[:, :, 1:]
         plt.close(fig)
         return buf
 

@@ -14,6 +14,7 @@ py_library(
         "//software/thunderscope/binary_context_managers:simulator",
         requirement("gymnasium"),
         requirement("numpy"),
+        requirement("matplotlib"),
     ],
 )
 
@@ -26,5 +27,7 @@ py_binary(
         requirement("gymnasium"),
         requirement("stable-baselines3"),
         requirement("pillow"),
+        requirement("opencv-python"),
+        requirement("numpy"),
     ],
 )

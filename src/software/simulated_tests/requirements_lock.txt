@@ -428,6 +428,7 @@ numpy==2.3.1 \
     #   contourpy
     #   gymnasium
     #   matplotlib
+    #   opencv-python
     #   pandas
     #   stable-baselines3
 nvidia-cublas-cu12==12.6.4.1 \
@@ -521,6 +522,15 @@ nvidia-nvtx-cu12==12.6.77 \
     --hash=sha256:b90bed3df379fa79afbd21be8e04a0314336b8ae16768b58f2d34cb1d04cd7d2 \
     --hash=sha256:f44f8d86bb7d5629988d61c8d3ae61dddb2015dee142740536bc7481b022fe4b
     # via torch
+opencv-python==4.10.0.84 \
+    --hash=sha256:09a332b50488e2dda866a6c5573ee192fe3583239fb26ff2f7f9ceb0bc119ea6 \
+    --hash=sha256:2db02bb7e50b703f0a2d50c50ced72e95c574e1e5a0bb35a8a86d0b35c98c236 \
+    --hash=sha256:32dbbd94c26f611dc5cc6979e6b7aa1f55a64d6b463cc1dcd3c95505a63e48fe \
+    --hash=sha256:71e575744f1d23f79741450254660442785f45a0797212852ee5199ef12eed98 \
+    --hash=sha256:72d234e4582e9658ffea8e9cae5b63d488ad06994ef12d81dc303b17472f3526 \
+    --hash=sha256:9ace140fc6d647fbe1c692bcb2abce768973491222c067c131d80957c595b71f \
+    --hash=sha256:fc182f8f4cda51b45f01c64e4cbedfc2f00aff799debebc305d8d0210c43f251
+    # via -r software/simulated_tests/requirements.in
 packaging==24.1 \
     --hash=sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002 \
     --hash=sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124
@@ -678,9 +688,7 @@ pillow==11.3.0 \
     --hash=sha256:f944255db153ebb2b19c51fe85dd99ef0ce494123f21b9db4877ffdfc5590c7c \
     --hash=sha256:fdae223722da47b024b867c1ea0be64e0df702c5e0a60e27daad39bf960dd1e4 \
     --hash=sha256:fe27fb049cdcca11f11a7bfda64043c37b30e6b91f10cb5bab275806c32f6ab3
-    # via
-    #   -r software/simulated_tests/requirements.in
-    #   matplotlib
+    # via matplotlib
 pluggy==1.5.0 \
     --hash=sha256:2cffa88e94fdc978c4c574f15f9e59b7f4201d439195c3715ca9e2486f1d0cf1 \
     --hash=sha256:44e1ad92c8ca002de6377e165f3e0f1be63266ab4d554740532335b9d75ea669
