@@ -6,6 +6,14 @@ from enum import IntEnum
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+from software.thunderscope.binary_context_managers.simulator import Simulator
+from software.thunderscope.proto_unix_io import ProtoUnixIO
+from proto.import_all_protos import *
+from software.thunderscope.thread_safe_buffer import ThreadSafeBuffer
+from proto.message_translation.tbots_protobuf import create_world_state
+import software.python_bindings as tbots_cpp
+from extlibs.er_force_sim.src.protobuf.world_pb2 import *
+
 
 class ActionIndex(IntEnum):
     VELOCITY_X = 0
@@ -18,18 +26,16 @@ class ActionIndex(IntEnum):
 class ObservationIndex(IntEnum):
     FRIENDLY_ROBOT_X = 0
     FRIENDLY_ROBOT_Y = 1
-    ENEMY_ROBOT_X = 2
-    ENEMY_ROBOT_Y = 3
-    BALL_X = 4
-    BALL_Y = 5
-
-
-from software.thunderscope.binary_context_managers.simulator import Simulator
-from software.thunderscope.proto_unix_io import ProtoUnixIO
-from proto.import_all_protos import *
-from software.thunderscope.thread_safe_buffer import ThreadSafeBuffer
-from proto.message_translation.tbots_protobuf import create_world_state
-import software.python_bindings as tbots_cpp
+    FRIENDLY_ROBOT_VX = 2
+    FRIENDLY_ROBOT_VY = 3
+    ENEMY_ROBOT_X = 4
+    ENEMY_ROBOT_Y = 5
+    ENEMY_ROBOT_VX = 6
+    ENEMY_ROBOT_VY = 7
+    BALL_X = 8
+    BALL_Y = 9
+    BALL_VX = 10
+    BALL_VY = 11
 
 
 class SimulatorGymEnv(gym.Env):
@@ -44,46 +50,53 @@ class SimulatorGymEnv(gym.Env):
         self.blue_io = None
         self.enable_realism = enable_realism
         self.primitive_seq = 0
+        self.ssl_geometry = None
 
         # Define action space as Box
         self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
         # Define observation space as Box
         self.observation_space = spaces.Box(
-            low=-10, high=10, shape=(6,), dtype=np.float32
+            low=-10, high=10, shape=(12,), dtype=np.float32
         )
 
         self.yellow_io = ProtoUnixIO()
         self.blue_io = ProtoUnixIO()
         self.simulator_io = ProtoUnixIO()
+        self.world_state_received_buffer = ThreadSafeBuffer(
+            1, WorldStateReceivedTrigger
+        )
         self.ssl_wrapper_buffer = ThreadSafeBuffer(1, SSL_WrapperPacket)
+        self.simulator_state_buffer = ThreadSafeBuffer(1, SimulatorState)
 
-    def _get_obs(self, ssl_wrapper):
-        # Default positions if no data available
-        friendly_pos = np.array([0.0, 0.0], dtype=np.float32)
-        enemy_pos = np.array([0.0, 0.0], dtype=np.float32)
-        ball_pos = np.array([0.0, 0.0], dtype=np.float32)
+    def _get_obs(self, sim_state):
+        # Default values if no data available
+        friendly_data = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        enemy_data = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        ball_data = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
 
-        if ssl_wrapper and ssl_wrapper.detection:
-            detection = ssl_wrapper.detection
-
-            # Get first yellow robot position
-            if detection.robots_yellow:
-                robot = detection.robots_yellow[0]
-                friendly_pos = np.array(
-                    [robot.x / 1000, robot.y / 1000], dtype=np.float32
+        if sim_state:
+            # Get first yellow robot position and velocity
+            if sim_state.yellow_robots:
+                robot = sim_state.yellow_robots[0]
+                friendly_data = np.array(
+                    [robot.p_x, robot.p_y, robot.v_x, robot.v_y], dtype=np.float32
                 )
 
-            # Get first blue robot position
-            if detection.robots_blue:
-                robot = detection.robots_blue[0]
-                enemy_pos = np.array([robot.x / 1000, robot.y / 1000], dtype=np.float32)
+            # Get first blue robot position and velocity
+            if sim_state.blue_robots:
+                robot = sim_state.blue_robots[0]
+                enemy_data = np.array(
+                    [robot.p_x, robot.p_y, robot.v_x, robot.v_y], dtype=np.float32
+                )
 
-            # Get ball position
-            if detection.balls:
-                ball = detection.balls[0]
-                ball_pos = np.array([ball.x / 1000, ball.y / 1000], dtype=np.float32)
+            # Get ball position and velocity
+            if sim_state.ball:
+                ball = sim_state.ball
+                ball_data = np.array(
+                    [ball.p_x, ball.p_y, ball.v_x, ball.v_y], dtype=np.float32
+                )
 
-        return np.concatenate([friendly_pos, enemy_pos, ball_pos])
+        return np.concatenate([friendly_data, enemy_data, ball_data])
 
     def _convert_action_to_primitive_set(self, action):
         # Scale velocities from [-1, 1] to actual robot limits
@@ -133,12 +146,15 @@ class SimulatorGymEnv(gym.Env):
 
         return primitive_set
 
-    def _get_enemy_goal_area(self, geometry):
+    def _get_enemy_goal_area(self):
         """Helper function to compute enemy goal area rectangle"""
-        field = geometry.field
+        if not self.ssl_geometry:
+            return 6.0, 6.18, -0.9, 0.9  # fallback values
+
+        field = self.ssl_geometry.field
+        field_length = field.field_length / 1000  # convert mm to m
         goal_width = field.goal_width / 1000
         goal_depth = field.goal_depth / 1000
-        field_length = field.field_length / 1000
 
         # Enemy goal is at positive X end
         x_min = field_length / 2
@@ -148,95 +164,80 @@ class SimulatorGymEnv(gym.Env):
 
         return x_min, x_max, y_min, y_max
 
-    def _is_ball_in_enemy_goal(self, ssl_wrapper):
+    def _is_ball_in_enemy_goal(self, sim_state):
         """Returns true if ball is in enemy goal area"""
-        if not ssl_wrapper or not ssl_wrapper.detection or not ssl_wrapper.geometry:
+        if not sim_state or not sim_state.ball:
             return False
 
-        if not ssl_wrapper.detection.balls:
-            return False
+        ball_x = sim_state.ball.p_x
+        ball_y = sim_state.ball.p_y
 
-        ball = ssl_wrapper.detection.balls[0]
-        ball_x, ball_y = ball.x / 1000, ball.y / 1000
-
-        x_min, x_max, y_min, y_max = self._get_enemy_goal_area(ssl_wrapper.geometry)
+        x_min, x_max, y_min, y_max = self._get_enemy_goal_area()
         return x_min <= ball_x <= x_max and y_min <= ball_y <= y_max
 
-    def _position_reward(self, ssl_wrapper):
+    def _position_reward(self, sim_state):
         """Ball position reward (0 to 1) based on field position"""
-        if not ssl_wrapper or not ssl_wrapper.detection or not ssl_wrapper.geometry:
+        if not sim_state or not sim_state.ball or not self.ssl_geometry:
             return 0.0
 
-        if not ssl_wrapper.detection.balls:
-            return 0.0
-
-        ball = ssl_wrapper.detection.balls[0]
-        ball_x = ball.x / 1000
-
-        field_length = ssl_wrapper.geometry.field.field_length / 1000
+        ball_x = sim_state.ball.p_x
+        field_length = self.ssl_geometry.field.field_length / 1000  # convert mm to m
         friendly_goal_x = -field_length / 2
         enemy_goal_x = field_length / 2
 
         position_reward = (ball_x - friendly_goal_x) / (enemy_goal_x - friendly_goal_x)
         return max(0.0, min(1.0, position_reward))
 
-    def _goal_reward(self, ssl_wrapper):
+    def _goal_reward(self, sim_state):
         """Goal area reward (10 if ball in enemy goal)"""
-        return 10.0 if self._is_ball_in_enemy_goal(ssl_wrapper) else 0.0
+        return 10.0 if self._is_ball_in_enemy_goal(sim_state) else 0.0
 
-    def _distance_reward(self, ssl_wrapper):
+    def _distance_reward(self, sim_state):
         """Distance-based reward (0 to 0.1) for robot proximity to ball"""
-        if not ssl_wrapper or not ssl_wrapper.detection:
+        if not sim_state or not sim_state.yellow_robots or not sim_state.ball:
             return 0.0
 
-        if not ssl_wrapper.detection.balls or not ssl_wrapper.detection.robots_yellow:
-            return 0.0
+        ball_x = sim_state.ball.p_x
+        ball_y = sim_state.ball.p_y
 
-        ball = ssl_wrapper.detection.balls[0]
-        robot = ssl_wrapper.detection.robots_yellow[0]
-
-        ball_x, ball_y = ball.x / 1000, ball.y / 1000
-        robot_x, robot_y = robot.x / 1000, robot.y / 1000
+        robot = sim_state.yellow_robots[0]
+        robot_x = robot.p_x
+        robot_y = robot.p_y
 
         distance = np.sqrt((robot_x - ball_x) ** 2 + (robot_y - ball_y) ** 2)
-        return max(0.0, 0.1 * (1.0 - distance / 1.0))
+        return max(0.0, (1.0 - distance / 1.0))
 
-    def _compute_reward(self, ssl_wrapper):
+    def _compute_reward(self, sim_state):
         return (
-            self._position_reward(ssl_wrapper)
-            + self._goal_reward(ssl_wrapper)
-            + self._distance_reward(ssl_wrapper) * 1000
+            # self._position_reward(sim_state)
+            # + self._goal_reward(sim_state)
+            +self._distance_reward(sim_state)
         )
 
     def reset(self, seed=None, options=None):
-        if self.simulator is not None:
-            self.simulator.__exit__(None, None, None)
+        if self.simulator is None:
+            self.simulator = Simulator(
+                self.simulator_runtime_dir, enable_realism=self.enable_realism
+            )
+            self.simulator.__enter__()
+            print("simulator started")
 
-        self.simulator = Simulator(
-            self.simulator_runtime_dir, enable_realism=self.enable_realism
-        )
-        self.simulator.__enter__()
-        print("simulator started")
-
-        self.yellow_io = ProtoUnixIO()
-        self.blue_io = ProtoUnixIO()
-        self.simulator_io = ProtoUnixIO()
-        self.simulator.setup_proto_unix_io(
-            blue_full_system_proto_unix_io=self.blue_io,
-            yellow_full_system_proto_unix_io=self.yellow_io,
-            simulator_proto_unix_io=self.simulator_io,
-        )
-        # we don't need to receive the wrapper packet twice, it's the same for yellow and blue
-        self.yellow_io.register_observer(SSL_WrapperPacket, self.ssl_wrapper_buffer)
-        print("proto IO set up")
-
-        # tick the simulator until something happens
-        ssl_wrapper = None
-        while ssl_wrapper is None:
-            tick = SimulatorTick(milliseconds=100)
-            self.simulator_io.send_proto(SimulatorTick, tick)
-            ssl_wrapper = self.ssl_wrapper_buffer.get(block=False, return_cached=False)
-        print("simulator is alive")
+            self.yellow_io = ProtoUnixIO()
+            self.blue_io = ProtoUnixIO()
+            self.simulator_io = ProtoUnixIO()
+            self.simulator.setup_proto_unix_io(
+                blue_full_system_proto_unix_io=self.blue_io,
+                yellow_full_system_proto_unix_io=self.yellow_io,
+                simulator_proto_unix_io=self.simulator_io,
+            )
+            self.simulator_io.register_observer(
+                WorldStateReceivedTrigger, self.world_state_received_buffer
+            )
+            self.yellow_io.register_observer(
+                SimulatorState, self.simulator_state_buffer
+            )
+            self.yellow_io.register_observer(SSL_WrapperPacket, self.ssl_wrapper_buffer)
+            print("proto IO set up")
 
         # Reset the world by sending a WorldState to simulator_io
         blue_bots = [
@@ -255,151 +256,173 @@ class SimulatorGymEnv(gym.Env):
             numpy.random.uniform(low=-0.5, high=0.5),
             numpy.random.uniform(low=-0.5, high=0.5),
         )
-
-        self.simulator_io.send_proto(
-            WorldState,
-            create_world_state(
-                yellow_robot_locations=yellow_bots,
-                blue_robot_locations=blue_bots,
-                ball_location=ball_initial_pos,
-                ball_velocity=tbots_cpp.Vector(0, 0),
-            ),
+        initial_world_state = create_world_state(
+            yellow_robot_locations=yellow_bots,
+            blue_robot_locations=blue_bots,
+            ball_location=ball_initial_pos,
+            ball_velocity=tbots_cpp.Vector(0, 0),
         )
-        print("sent reset world state")
+        print("sending reset world state")
+        world_state_received = None
+        while world_state_received is None:
+            self.simulator_io.send_proto(WorldState, initial_world_state)
+            world_state_received = self.world_state_received_buffer.get(
+                block=False, return_cached=False
+            )
+        print("world state reset acked")
 
-        self.ssl_wrapper = self.ssl_wrapper_buffer.get(block=True, return_cached=False)
-        return self._get_obs(self.ssl_wrapper), {}
+        # tick the simulator until something happens
+        world = None
+        while world is None:
+            tick = SimulatorTick(milliseconds=100)
+            self.simulator_io.send_proto(SimulatorTick, tick)
+            world = self.simulator_state_buffer.get(block=False, return_cached=False)
+        print("simulator is alive")
+
+        # tick the simulator once for everything to show up
+        tick = SimulatorTick(milliseconds=100)
+        self.simulator_io.send_proto(SimulatorTick, tick)
+        self.sim_state = self.simulator_state_buffer.get(
+            block=True, return_cached=False
+        )
+        # update the field geometry from the SSL_WrapperPacket
+        self.ssl_geometry = self.ssl_wrapper_buffer.get(
+            block=True, return_cached=False
+        ).geometry
+        return self._get_obs(self.sim_state), {}
 
     def step(self, action):
         primitive_set = self._convert_action_to_primitive_set(action)
         self.yellow_io.send_proto(PrimitiveSet, primitive_set)
         tick = SimulatorTick(milliseconds=100)
         self.simulator_io.send_proto(SimulatorTick, tick)
-        self.ssl_wrapper = self.ssl_wrapper_buffer.get(block=True, return_cached=False)
-        obs = self._get_obs(self.ssl_wrapper)
-        reward = self._compute_reward(self.ssl_wrapper)
-        terminated = self._is_ball_in_enemy_goal(self.ssl_wrapper)
+        self.sim_state = self.simulator_state_buffer.get(
+            block=True, return_cached=False
+        )
+
+        # update the field geometry from the SSL_WrapperPacket
+        self.ssl_geometry = self.ssl_wrapper_buffer.get(
+            block=True, return_cached=False
+        ).geometry
+
+        obs = self._get_obs(self.sim_state)
+        reward = self._compute_reward(self.sim_state)
+        terminated = self._is_ball_in_enemy_goal(self.sim_state)
         truncated = False
         info = {}
         return obs, reward, terminated, truncated, info
 
     def render(self):
-        ssl_wrapper = self.ssl_wrapper_buffer.get(block=False)
-        if not ssl_wrapper:
+        sim_state = self.simulator_state_buffer.get(block=False)
+        if not sim_state or not self.ssl_geometry:
             return np.zeros((400, 600, 3), dtype=np.uint8)
 
         fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
 
-        # Draw field lines from geometry
-        if ssl_wrapper.geometry:
-            field = ssl_wrapper.geometry.field
-            field_length = field.field_length / 1000
-            field_width = field.field_width / 1000
-            goal_width = field.goal_width / 1000
-            goal_depth = field.goal_depth / 1000
+        # Draw field lines using SSL geometry data
+        field = self.ssl_geometry.field
+        field_length = field.field_length / 1000  # convert mm to m
+        field_width = field.field_width / 1000
+        goal_width = field.goal_width / 1000
+        goal_depth = field.goal_depth / 1000
 
-            # Field boundary
-            field_rect = patches.Rectangle(
-                (-field_length / 2, -field_width / 2),
-                field_length,
-                field_width,
-                linewidth=2,
-                edgecolor="white",
-                facecolor="green",
-                alpha=0.3,
-            )
-            ax.add_patch(field_rect)
+        # Field boundary
+        field_rect = patches.Rectangle(
+            (-field_length / 2, -field_width / 2),
+            field_length,
+            field_width,
+            linewidth=2,
+            edgecolor="white",
+            facecolor="green",
+            alpha=0.3,
+        )
+        ax.add_patch(field_rect)
 
-            # Center circle
-            center_circle = patches.Circle(
-                (0, 0),
-                field.center_circle_radius / 1000,
-                linewidth=2,
-                edgecolor="white",
-                facecolor="none",
-            )
-            ax.add_patch(center_circle)
+        # Center circle
+        center_circle = patches.Circle(
+            (0, 0),
+            field.center_circle_radius / 1000,  # convert mm to m
+            linewidth=2,
+            edgecolor="white",
+            facecolor="none",
+        )
+        ax.add_patch(center_circle)
 
-            # Goal areas
-            goal_area_depth = field.goal_depth / 1000
-            goal_area_width = field.goal_width / 1000
+        # Left goal area
+        left_goal_area = patches.Rectangle(
+            (-field_length / 2, -goal_width / 2),
+            goal_depth,
+            goal_width,
+            linewidth=2,
+            edgecolor="white",
+            facecolor="none",
+        )
+        ax.add_patch(left_goal_area)
 
-            # Left goal area
-            left_goal_area = patches.Rectangle(
-                (-field_length / 2, -goal_area_width / 2),
-                goal_depth,
-                goal_width,
-                linewidth=2,
-                edgecolor="white",
-                facecolor="none",
-            )
-            ax.add_patch(left_goal_area)
+        # Right goal area
+        right_goal_area = patches.Rectangle(
+            (field_length / 2 - goal_depth, -goal_width / 2),
+            goal_depth,
+            goal_width,
+            linewidth=2,
+            edgecolor="white",
+            facecolor="none",
+        )
+        ax.add_patch(right_goal_area)
 
-            # Right goal area
-            right_goal_area = patches.Rectangle(
-                (field_length / 2 - goal_area_depth, -goal_area_width / 2),
-                goal_depth,
-                goal_width,
-                linewidth=2,
-                edgecolor="white",
-                facecolor="none",
-            )
-            ax.add_patch(right_goal_area)
+        # Goals
+        left_goal = patches.Rectangle(
+            (-field_length / 2 - goal_depth, -goal_width / 2),
+            goal_depth,
+            goal_width,
+            linewidth=2,
+            edgecolor="white",
+            facecolor="none",
+        )
+        ax.add_patch(left_goal)
 
-            # Goals
-            left_goal = patches.Rectangle(
-                (-field_length / 2 - goal_depth, -goal_width / 2),
-                goal_depth,
-                goal_width,
-                linewidth=2,
-                edgecolor="white",
-                facecolor="none",
-            )
-            ax.add_patch(left_goal)
-
-            right_goal = patches.Rectangle(
-                (field_length / 2, -goal_width / 2),
-                goal_depth,
-                goal_width,
-                linewidth=2,
-                edgecolor="white",
-                facecolor="none",
-            )
-            ax.add_patch(right_goal)
+        right_goal = patches.Rectangle(
+            (field_length / 2, -goal_width / 2),
+            goal_depth,
+            goal_width,
+            linewidth=2,
+            edgecolor="white",
+            facecolor="none",
+        )
+        ax.add_patch(right_goal)
 
         # Draw robots and ball
         robot_radius = 0.09  # 180mm diameter = 90mm radius
 
-        if ssl_wrapper.detection:
-            # Yellow robots (friendly)
-            for robot in ssl_wrapper.detection.robots_yellow:
-                circle = patches.Circle(
-                    (robot.x / 1000, robot.y / 1000),
-                    robot_radius,
-                    facecolor="yellow",
-                    edgecolor="black",
-                )
-                ax.add_patch(circle)
+        # Yellow robots (friendly)
+        for robot in sim_state.yellow_robots:
+            circle = patches.Circle(
+                (robot.p_x, robot.p_y),
+                robot_radius,
+                facecolor="yellow",
+                edgecolor="black",
+            )
+            ax.add_patch(circle)
 
-            # Blue robots (enemy)
-            for robot in ssl_wrapper.detection.robots_blue:
-                circle = patches.Circle(
-                    (robot.x / 1000, robot.y / 1000),
-                    robot_radius,
-                    facecolor="blue",
-                    edgecolor="black",
-                )
-                ax.add_patch(circle)
+        # Blue robots (enemy)
+        for robot in sim_state.blue_robots:
+            circle = patches.Circle(
+                (robot.p_x, robot.p_y),
+                robot_radius,
+                facecolor="blue",
+                edgecolor="black",
+            )
+            ax.add_patch(circle)
 
-            # Ball
-            for ball in ssl_wrapper.detection.balls:
-                circle = patches.Circle(
-                    (ball.x / 1000, ball.y / 1000),
-                    0.0215,
-                    facecolor="orange",
-                    edgecolor="black",
-                )
-                ax.add_patch(circle)
+        # Ball
+        if sim_state.ball:
+            circle = patches.Circle(
+                (sim_state.ball.p_x, sim_state.ball.p_y),
+                0.0215,
+                facecolor="orange",
+                edgecolor="black",
+            )
+            ax.add_patch(circle)
 
         ax.set_xlim(-6, 6)
         ax.set_ylim(-4, 4)

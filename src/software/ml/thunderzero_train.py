@@ -1,3 +1,4 @@
+from gymnasium.wrappers import TimeLimit
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from software.ml.simulator_env import SimulatorGymEnv
@@ -11,12 +12,17 @@ def train():
     path = (
         f"/tmp/{datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')}"
     )
-    create_sim_env = lambda: SimulatorGymEnv(
-        simulator_runtime_dir=f"{path}/thunderbots_simulator/{uuid.uuid4().__str__()[:8]}"
+    create_sim_env = lambda: TimeLimit(
+        SimulatorGymEnv(
+            simulator_runtime_dir=f"{path}/thunderbots_simulator/{uuid.uuid4().__str__()[:8]}"
+        ),
+        max_episode_steps=300,
+    )  # set time limit to 5 real minutes per episode
+    vec_env = make_vec_env(create_sim_env, n_envs=6)
+    model = PPO(
+        "MlpPolicy", vec_env, verbose=1, device="cpu", tensorboard_log=f"{path}/tb_logs"
     )
-    vec_env = make_vec_env(create_sim_env, n_envs=2)
-    model = PPO("MlpPolicy", vec_env, verbose=1)
-    model.learn(total_timesteps=10_000)
+    model.learn(total_timesteps=1_000_000)
     model.save(f"{path}/thunderzero_model.ckpt")
 
     # do one rollout for rendering

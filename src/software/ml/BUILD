@@ -15,6 +15,7 @@ py_library(
         requirement("gymnasium"),
         requirement("numpy"),
         requirement("matplotlib"),
+        requirement("tensorboard"),
     ],
 )
 
