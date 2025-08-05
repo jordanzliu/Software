@@ -7,6 +7,7 @@ py_library(
     srcs = ["simulator_env.py"],
     visibility = ["//visibility:public"],
     deps = [
+        ":utils",
         "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
         "//proto:import_all_protos",
         "//proto/message_translation:py_tbots_protobuf",
@@ -16,6 +17,20 @@ py_library(
         requirement("numpy"),
         requirement("matplotlib"),
         requirement("tensorboard"),
+        requirement("numpy-quaternion"),
+    ],
+)
+
+py_library(
+    name = "utils",
+    srcs = ["utils.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
+        "//proto:import_all_protos",
+        "//proto/message_translation:py_tbots_protobuf",
+        requirement("numpy"),
+        requirement("numpy-quaternion"),
     ],
 )
 
@@ -25,10 +40,12 @@ py_binary(
     data = ["//software:python_bindings"],
     deps = [
         ":simulator_env",
+        ":utils",
         requirement("gymnasium"),
         requirement("stable-baselines3"),
         requirement("pillow"),
         requirement("opencv-python"),
         requirement("numpy"),
+        requirement("numpy-quaternion"),
     ],
 )

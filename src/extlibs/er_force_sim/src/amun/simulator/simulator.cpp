@@ -433,6 +433,8 @@ world::SimulatorState Simulator::getSimulatorState()
             coordinates::toVisionVelocity(robotProto, robotProto);
             robotProto.set_v_x(robotProto.v_x() / 1000);
             robotProto.set_v_y(robotProto.v_y() / 1000);
+            robotProto.set_can_kick_ball(
+                nullptr != m_data->ball ? robot->canKickBall(*m_data->ball) : false);
         }
     }
 

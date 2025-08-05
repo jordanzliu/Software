@@ -22,7 +22,7 @@ def train():
     model = PPO(
         "MlpPolicy", vec_env, verbose=1, device="cpu", tensorboard_log=f"{path}/tb_logs"
     )
-    model.learn(total_timesteps=1_000_000)
+    model.learn(total_timesteps=10_000)
     model.save(f"{path}/thunderzero_model.ckpt")
 
     # do one rollout for rendering

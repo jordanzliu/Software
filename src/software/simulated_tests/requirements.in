@@ -1,5 +1,7 @@
 pytest==6.2.5
-gymnasium==1.2.0
+gymnasium==1.0.0
 stable_baselines3==2.7.0
 opencv-python==4.10.0.84
 tensorboard
+ray[rllib]
+numpy-quaternion

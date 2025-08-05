@@ -5,6 +5,7 @@ import numpy as np
 from enum import IntEnum
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import quaternion
 
 from software.thunderscope.binary_context_managers.simulator import Simulator
 from software.thunderscope.proto_unix_io import ProtoUnixIO
@@ -13,6 +14,7 @@ from software.thunderscope.thread_safe_buffer import ThreadSafeBuffer
 from proto.message_translation.tbots_protobuf import create_world_state
 import software.python_bindings as tbots_cpp
 from extlibs.er_force_sim.src.protobuf.world_pb2 import *
+from software.ml.utils import transform_to_robot_frame
 
 
 class ActionIndex(IntEnum):
@@ -56,7 +58,7 @@ class SimulatorGymEnv(gym.Env):
         self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
         # Define observation space as Box
         self.observation_space = spaces.Box(
-            low=-10, high=10, shape=(12,), dtype=np.float32
+            low=-10, high=10, shape=(14,), dtype=np.float32
         )
 
         self.yellow_io = ProtoUnixIO()
@@ -70,31 +72,65 @@ class SimulatorGymEnv(gym.Env):
 
     def _get_obs(self, sim_state):
         # Default values if no data available
-        friendly_data = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
-        enemy_data = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        friendly_data = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=np.float32)
+        enemy_data = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=np.float32)
         ball_data = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
 
-        if sim_state:
-            # Get first yellow robot position and velocity
-            if sim_state.yellow_robots:
-                robot = sim_state.yellow_robots[0]
-                friendly_data = np.array(
-                    [robot.p_x, robot.p_y, robot.v_x, robot.v_y], dtype=np.float32
-                )
+        if sim_state and sim_state.yellow_robots:
+            yellow_robot = sim_state.yellow_robots[0]
 
-            # Get first blue robot position and velocity
+            # Yellow robot data (always at origin in its own frame)
+            friendly_data = np.array(
+                [
+                    yellow_robot.p_x,
+                    yellow_robot.p_y,
+                    yellow_robot.v_x,
+                    yellow_robot.v_y,
+                ],
+                dtype=np.float32,
+            )
+
+            # Transform blue robot to yellow robot's frame
             if sim_state.blue_robots:
-                robot = sim_state.blue_robots[0]
-                enemy_data = np.array(
-                    [robot.p_x, robot.p_y, robot.v_x, robot.v_y], dtype=np.float32
+                blue_robot = sim_state.blue_robots[0]
+                blue_q = quaternion.quaternion(
+                    blue_robot.rotation.real,
+                    blue_robot.rotation.i,
+                    blue_robot.rotation.j,
+                    blue_robot.rotation.k,
+                )
+                _, _, blue_yaw = quaternion.as_euler_angles(blue_q)
+
+                rel_x, rel_y, rel_theta = transform_to_robot_frame(
+                    blue_robot.p_x, blue_robot.p_y, blue_yaw, yellow_robot
+                )
+                rel_vx, rel_vy, _ = transform_to_robot_frame(
+                    blue_robot.v_x, blue_robot.v_y, 0, yellow_robot
                 )
 
-            # Get ball position and velocity
+                enemy_data = np.array(
+                    [
+                        rel_x,
+                        rel_y,
+                        rel_vx,
+                        rel_vy,
+                        np.cos(rel_theta),
+                        np.sin(rel_theta),
+                    ],
+                    dtype=np.float32,
+                )
+
+            # Transform ball to yellow robot's frame
             if sim_state.ball:
                 ball = sim_state.ball
-                ball_data = np.array(
-                    [ball.p_x, ball.p_y, ball.v_x, ball.v_y], dtype=np.float32
+                rel_x, rel_y, _ = transform_to_robot_frame(
+                    ball.p_x, ball.p_y, 0, yellow_robot
                 )
+                rel_vx, rel_vy, _ = transform_to_robot_frame(
+                    ball.v_x, ball.v_y, 0, yellow_robot
+                )
+
+                ball_data = np.array([rel_x, rel_y, rel_vx, rel_vy], dtype=np.float32)
 
         return np.concatenate([friendly_data, enemy_data, ball_data])
 
@@ -315,9 +351,9 @@ class SimulatorGymEnv(gym.Env):
     def render(self):
         sim_state = self.simulator_state_buffer.get(block=False)
         if not sim_state or not self.ssl_geometry:
-            return np.zeros((400, 600, 3), dtype=np.uint8)
+            return np.zeros((800, 1200, 3), dtype=np.uint8)
 
-        fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=200)
 
         # Draw field lines using SSL geometry data
         field = self.ssl_geometry.field
@@ -403,6 +439,10 @@ class SimulatorGymEnv(gym.Env):
                 edgecolor="black",
             )
             ax.add_patch(circle)
+            # Orientation line
+            end_x = robot.p_x + robot_radius * np.cos(robot.r_z)
+            end_y = robot.p_y + robot_radius * np.sin(robot.r_z)
+            ax.plot([robot.p_x, end_x], [robot.p_y, end_y], "k-", linewidth=1)
 
         # Blue robots (enemy)
         for robot in sim_state.blue_robots:
@@ -413,6 +453,10 @@ class SimulatorGymEnv(gym.Env):
                 edgecolor="black",
             )
             ax.add_patch(circle)
+            # Orientation line
+            end_x = robot.p_x + robot_radius * np.cos(robot.r_z)
+            end_y = robot.p_y + robot_radius * np.sin(robot.r_z)
+            ax.plot([robot.p_x, end_x], [robot.p_y, end_y], "k-", linewidth=1)
 
         # Ball
         if sim_state.ball:
