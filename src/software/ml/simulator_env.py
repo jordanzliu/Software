@@ -58,7 +58,7 @@ class SimulatorGymEnv(gym.Env):
         self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
         # Define observation space as Box
         self.observation_space = spaces.Box(
-            low=-10, high=10, shape=(14,), dtype=np.float32
+            low=-10, high=10, shape=(15,), dtype=np.float32
         )
 
         self.yellow_io = ProtoUnixIO()
@@ -72,7 +72,7 @@ class SimulatorGymEnv(gym.Env):
 
     def _get_obs(self, sim_state):
         # Default values if no data available
-        friendly_data = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=np.float32)
+        friendly_data = np.array([0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
         enemy_data = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=np.float32)
         ball_data = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
 
@@ -86,6 +86,7 @@ class SimulatorGymEnv(gym.Env):
                     yellow_robot.p_y,
                     yellow_robot.v_x,
                     yellow_robot.v_y,
+                    1.0 if yellow_robot.can_kick_ball else 0.0,
                 ],
                 dtype=np.float32,
             )
@@ -136,11 +137,22 @@ class SimulatorGymEnv(gym.Env):
 
     def _convert_action_to_primitive_set(self, action):
         # Scale velocities from [-1, 1] to actual robot limits
-        velocity_x = action[ActionIndex.VELOCITY_X] * 3.0  # 3.0 m/s max speed
-        velocity_y = action[ActionIndex.VELOCITY_Y] * 3.0  # 3.0 m/s max speed
+        local_vx = action[ActionIndex.VELOCITY_X] * 3.0  # 3.0 m/s max speed
+        local_vy = action[ActionIndex.VELOCITY_Y] * 3.0  # 3.0 m/s max speed
         angular_velocity = (
             action[ActionIndex.VELOCITY_ANGULAR] * 10.0
         )  # 10.0 rad/s max angular speed
+
+        # Transform velocity from robot frame to world frame
+        if self.sim_state and self.sim_state.yellow_robots:
+            robot_angle = self.sim_state.yellow_robots[0].r_z
+            cos_theta = np.cos(robot_angle)
+            sin_theta = np.sin(robot_angle)
+            velocity_x = local_vx * cos_theta - local_vy * sin_theta
+            velocity_y = local_vx * sin_theta + local_vy * cos_theta
+        else:
+            velocity_x = local_vx
+            velocity_y = local_vy
 
         # Create DirectVelocityControl
         velocity_control = MotorControl.DirectVelocityControl()
@@ -226,7 +238,7 @@ class SimulatorGymEnv(gym.Env):
 
     def _goal_reward(self, sim_state):
         """Goal area reward (10 if ball in enemy goal)"""
-        return 10.0 if self._is_ball_in_enemy_goal(sim_state) else 0.0
+        return 1.0 if self._is_ball_in_enemy_goal(sim_state) else 0.0
 
     def _distance_reward(self, sim_state):
         """Distance-based reward (0 to 0.1) for robot proximity to ball"""
@@ -243,11 +255,52 @@ class SimulatorGymEnv(gym.Env):
         distance = np.sqrt((robot_x - ball_x) ** 2 + (robot_y - ball_y) ** 2)
         return max(0.0, (1.0 - distance / 1.0))
 
-    def _compute_reward(self, sim_state):
+    def _possession_reward(self, sim_state):
+        if not sim_state or not sim_state.yellow_robots or not sim_state.ball:
+            return 0.0
+
+        return 1.0 if sim_state.yellow_robots[0].can_kick_ball else 0
+
+    def _dribble_reward(self, sim_state, action):
+        if (
+            not sim_state
+            or not sim_state.yellow_robots
+            or not sim_state.ball
+            or action is None
+        ):
+            return 0.0
+
         return (
-            # self._position_reward(sim_state)
-            # + self._goal_reward(sim_state)
-            +self._distance_reward(sim_state)
+            1.0
+            if sim_state.yellow_robots[0].can_kick_ball
+            and action[ActionIndex.AUTO_DRIBBLE] > 0.5
+            else 0
+        )
+
+    def _kick_reward(self, sim_state, action):
+        if (
+            not sim_state
+            or not sim_state.yellow_robots
+            or not sim_state.ball
+            or action is None
+        ):
+            return 0.0
+
+        return (
+            1.0
+            if sim_state.yellow_robots[0].can_kick_ball
+            and action[ActionIndex.AUTO_KICK] > 0.5
+            else 0.0
+        )
+
+    def _compute_reward(self, sim_state, action):
+        return (
+            # self._position_reward(sim_state) * 50
+            +self._goal_reward(sim_state) * 100
+            + self._distance_reward(sim_state)
+            + self._possession_reward(sim_state)
+            + self._dribble_reward(sim_state, action) * 5
+            + self._kick_reward(sim_state, action) * 10
         )
 
     def reset(self, seed=None, options=None):
@@ -342,7 +395,7 @@ class SimulatorGymEnv(gym.Env):
         ).geometry
 
         obs = self._get_obs(self.sim_state)
-        reward = self._compute_reward(self.sim_state)
+        reward = self._compute_reward(self.sim_state, action)
         terminated = self._is_ball_in_enemy_goal(self.sim_state)
         truncated = False
         info = {}
