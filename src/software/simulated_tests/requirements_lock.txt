@@ -1245,7 +1245,7 @@ pyyaml==6.0.2 \
     --hash=sha256:f753120cb8181e736c57ef7636e83f31b9c0d1722c516f7e86cf15b7aa57ff12 \
     --hash=sha256:ff3824dc5261f50c9b0dfb3be22b4567a6f938ccce4587b38952d85fd9e9afe4
     # via ray
-ray[rllib]==2.48.0 \
+ray[rllib,tune]==2.48.0 \
     --hash=sha256:24a70f416ec0be14b975f160044805ccb48cc6bc50de632983eb8f0a8e16682b \
     --hash=sha256:25e4b79fcc8f849d72db1acc4f03f37008c5c0b745df63d8a30cd35676b6545e \
     --hash=sha256:33bda4753ad0acd2b524c9158089d43486cd44cc59fe970466435bc2968fde2d \

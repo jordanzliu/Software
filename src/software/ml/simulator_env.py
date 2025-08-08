@@ -5,7 +5,6 @@ import numpy as np
 from enum import IntEnum
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import quaternion
 
 from software.thunderscope.binary_context_managers.simulator import Simulator
 from software.thunderscope.proto_unix_io import ProtoUnixIO
@@ -14,7 +13,6 @@ from software.thunderscope.thread_safe_buffer import ThreadSafeBuffer
 from proto.message_translation.tbots_protobuf import create_world_state
 import software.python_bindings as tbots_cpp
 from extlibs.er_force_sim.src.protobuf.world_pb2 import *
-from software.ml.utils import transform_to_robot_frame
 from software.ml.reward_functions import (
     is_ball_in_enemy_goal,
     goal_reward,
@@ -39,14 +37,23 @@ class ObservationIndex(IntEnum):
     FRIENDLY_ROBOT_Y = 1
     FRIENDLY_ROBOT_VX = 2
     FRIENDLY_ROBOT_VY = 3
-    ENEMY_ROBOT_X = 4
-    ENEMY_ROBOT_Y = 5
-    ENEMY_ROBOT_VX = 6
-    ENEMY_ROBOT_VY = 7
-    BALL_X = 8
-    BALL_Y = 9
-    BALL_VX = 10
-    BALL_VY = 11
+    FRIENDLY_ROBOT_HEADING_COS = 4
+    FRIENDLY_ROBOT_HEADING_SIN = 5
+    FRIENDLY_ROBOT_CAN_KICK = 6
+    ENEMY_ROBOT_REL_X = 7
+    ENEMY_ROBOT_REL_Y = 8
+    ENEMY_ROBOT_X = 9
+    ENEMY_ROBOT_Y = 10
+    ENEMY_ROBOT_VX = 11
+    ENEMY_ROBOT_VY = 12
+    ENEMY_ROBOT_HEADING_COS = 13
+    ENEMY_ROBOT_HEADING_SIN = 14
+    BALL_REL_X = 15
+    BALL_REL_Y = 16
+    BALL_X = 17
+    BALL_Y = 18
+    BALL_VX = 19
+    BALL_VY = 20
 
 
 class SimulatorGymEnv(gym.Env):
@@ -67,7 +74,7 @@ class SimulatorGymEnv(gym.Env):
         self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
         # Define observation space as Box
         self.observation_space = spaces.Box(
-            low=-10, high=10, shape=(15,), dtype=np.float32
+            low=-10, high=10, shape=(21,), dtype=np.float32
         )
 
         self.yellow_io = ProtoUnixIO()
@@ -76,8 +83,8 @@ class SimulatorGymEnv(gym.Env):
         self.world_state_received_buffer = ThreadSafeBuffer(
             1, WorldStateReceivedTrigger
         )
-        self.ssl_wrapper_buffer = ThreadSafeBuffer(1, SSL_WrapperPacket)
-        self.simulator_state_buffer = ThreadSafeBuffer(1, SimulatorState)
+        self.ssl_wrapper_buffer = ThreadSafeBuffer(10, SSL_WrapperPacket)
+        self.simulator_state_buffer = ThreadSafeBuffer(10, SimulatorState)
 
     def _get_obs(self, sim_state):
         # Default values if no data available
@@ -88,59 +95,50 @@ class SimulatorGymEnv(gym.Env):
         if sim_state and sim_state.yellow_robots:
             yellow_robot = sim_state.yellow_robots[0]
 
-            # Yellow robot data (always at origin in its own frame)
+            # Yellow robot data
             friendly_data = np.array(
                 [
                     yellow_robot.p_x,
                     yellow_robot.p_y,
                     yellow_robot.v_x,
                     yellow_robot.v_y,
+                    np.cos(yellow_robot.r_z),
+                    np.sin(yellow_robot.r_z),
                     1.0 if yellow_robot.can_kick_ball else 0.0,
                 ],
                 dtype=np.float32,
             )
 
-            # Transform blue robot to yellow robot's frame
+            # Relative position to blue robot
             if sim_state.blue_robots:
                 blue_robot = sim_state.blue_robots[0]
-                blue_q = quaternion.quaternion(
-                    blue_robot.rotation.real,
-                    blue_robot.rotation.i,
-                    blue_robot.rotation.j,
-                    blue_robot.rotation.k,
-                )
-                _, _, blue_yaw = quaternion.as_euler_angles(blue_q)
-
-                rel_x, rel_y, rel_theta = transform_to_robot_frame(
-                    blue_robot.p_x, blue_robot.p_y, blue_yaw, yellow_robot
-                )
-                rel_vx, rel_vy, _ = transform_to_robot_frame(
-                    blue_robot.v_x, blue_robot.v_y, 0, yellow_robot
-                )
+                rel_x = blue_robot.p_x - yellow_robot.p_x
+                rel_y = blue_robot.p_y - yellow_robot.p_y
 
                 enemy_data = np.array(
                     [
                         rel_x,
                         rel_y,
-                        rel_vx,
-                        rel_vy,
-                        np.cos(rel_theta),
-                        np.sin(rel_theta),
+                        blue_robot.p_x,
+                        blue_robot.p_y,
+                        blue_robot.v_x,
+                        blue_robot.v_y,
+                        np.cos(blue_robot.r_z),
+                        np.sin(blue_robot.r_z),
                     ],
                     dtype=np.float32,
                 )
 
-            # Transform ball to yellow robot's frame
+            # Relative position to yellow robot
             if sim_state.ball:
                 ball = sim_state.ball
-                rel_x, rel_y, _ = transform_to_robot_frame(
-                    ball.p_x, ball.p_y, 0, yellow_robot
-                )
-                rel_vx, rel_vy, _ = transform_to_robot_frame(
-                    ball.v_x, ball.v_y, 0, yellow_robot
-                )
+                rel_x = ball.p_x - yellow_robot.p_x
+                rel_y = ball.p_y - yellow_robot.p_y
 
-                ball_data = np.array([rel_x, rel_y, rel_vx, rel_vy], dtype=np.float32)
+                ball_data = np.array(
+                    [rel_x, rel_y, ball.p_x, ball.p_y, ball.v_x, ball.v_y],
+                    dtype=np.float32,
+                )
 
         return np.concatenate([friendly_data, enemy_data, ball_data])
 
@@ -294,7 +292,22 @@ class SimulatorGymEnv(gym.Env):
     def step(self, action):
         primitive_set = self._convert_action_to_primitive_set(action)
         self.yellow_io.send_proto(PrimitiveSet, primitive_set)
-        tick = SimulatorTick(milliseconds=100)
+        # tick the simulator at 100hz but only plan at 10hz
+        for i in range(9):
+            tick = SimulatorTick(milliseconds=10)
+            self.simulator_io.send_proto(SimulatorTick, tick)
+
+        # clear the buffer
+        simulator_state = self.simulator_state_buffer.get(
+            block=False, return_cached=False
+        )
+        while simulator_state is not None:
+            simulator_state = self.simulator_state_buffer.get(
+                block=False, return_cached=False
+            )
+
+        # send the last tick
+        tick = SimulatorTick(milliseconds=10)
         self.simulator_io.send_proto(SimulatorTick, tick)
         self.sim_state = self.simulator_state_buffer.get(
             block=True, return_cached=False

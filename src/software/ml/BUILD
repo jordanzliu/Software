@@ -25,6 +25,7 @@ py_library(
         "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
         "//proto:import_all_protos",
         "//proto/message_translation:py_tbots_protobuf",
+        "//software/ml:reward_functions",
         "//software/thunderscope:proto_unix_io",
         "//software/thunderscope/binary_context_managers:simulator",
         requirement("gymnasium"),
@@ -63,5 +64,24 @@ py_binary(
         requirement("numpy-quaternion"),
         requirement("imageio"),
         requirement("requests"),
+    ],
+)
+
+py_binary(
+    name = "thunderzero_train_with_ray",
+    srcs = ["thunderzero_train_with_ray.py"],
+    data = ["//software:python_bindings"],
+    deps = [
+        ":simulator_env",
+        ":utils",
+        requirement("gymnasium"),
+        requirement("stable-baselines3"),
+        requirement("pillow"),
+        requirement("opencv-python"),
+        requirement("numpy"),
+        requirement("numpy-quaternion"),
+        requirement("imageio"),
+        requirement("requests"),
+        requirement("ray"),
     ],
 )

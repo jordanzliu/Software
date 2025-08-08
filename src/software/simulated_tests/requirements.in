@@ -3,7 +3,8 @@ gymnasium==1.0.0
 stable_baselines3==2.7.0
 opencv-python==4.10.0.84
 tensorboard
-ray[rllib]
+ray
+ray[rllib, tune]
 numpy-quaternion
 moviepy
 imageio

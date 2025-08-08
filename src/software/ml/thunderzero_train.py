@@ -102,7 +102,7 @@ def train():
         ),
         max_episode_steps=300,
     )  # set time limit to 5 real minutes per episode
-    vec_env = make_vec_env(create_sim_env, n_envs=4)
+    vec_env = make_vec_env(create_sim_env, n_envs=6)
     video_callback = VideoRecorderCallback(
         out_path=path, eval_env=create_sim_env(), render_freq=100_000, n_eval_episodes=1
     )
