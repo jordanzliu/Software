@@ -3,7 +3,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
-from software.ml.simulator_env import SimulatorGymEnv
+from stable_baselines3.common.noise import NormalActionNoise
+from software.ml.simulator_env import SimulatorGymEnv, ActionIndex
 from stable_baselines3.common.logger import Video
 import uuid
 import time
@@ -13,16 +14,10 @@ import torch
 import numpy as np
 import gymnasium as gym
 
-
-class TensorboardEvalCallback(BaseCallback):
-    def __init__(
-        self,
-        eval_env: gym.Env,
-        render_freq: int,
-        n_eval_episodes: int = 1,
-        deterministic: bool = True,
-    ):
-        """Records a video of an agent's trajectory traversing ``eval_env`` and logs it to TensorBoard
+class VideoRecorderCallback(BaseCallback):
+    def __init__(self, out_path: str, eval_env: gym.Env, render_freq: int, n_eval_episodes: int = 1, deterministic: bool = True):
+        """
+        Records a video of an agent's trajectory traversing ``eval_env`` and logs it to TensorBoard
 
         :param eval_env: A gym environment from which the trajectory is recorded
         :param render_freq: Render the agent's trajectory every eval_freq call of the callback.
@@ -30,6 +25,7 @@ class TensorboardEvalCallback(BaseCallback):
         :param deterministic: Whether to use deterministic or stochastic policy
         """
         super().__init__()
+        self._out_path = out_path
         self._eval_env = eval_env
         self._render_freq = render_freq
         self._n_eval_episodes = n_eval_episodes
@@ -40,7 +36,8 @@ class TensorboardEvalCallback(BaseCallback):
             screens = []
 
             def grab_screens(_locals, _globals) -> None:
-                """Renders the environment in its current state, recording the screen in the captured `screens` list
+                """
+                Renders the environment in its current state, recording the screen in the captured `screens` list
 
                 :param _locals: A dictionary containing all local variables of the callback's scope
                 :param _globals: A dictionary containing all global variables of the callback's scope
@@ -64,12 +61,37 @@ class TensorboardEvalCallback(BaseCallback):
                 Video(torch.from_numpy(np.asarray([screens])), fps=10),
                 exclude=("stdout", "log", "json", "csv"),
             )
+            self.logger.info("Logged video to tensorboard")
+
+            # stupid bodge to record an extra video
+            obs, _ = self._eval_env.reset()
+            img = self._eval_env.render()
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            video_writer = cv2.VideoWriter(
+                f"{self._out_path}/step_{self.n_calls}.mp4", fourcc, 10.0, (img.shape[1], img.shape[0])
+            )
+
+            for i in range(1000):
+                action, _states = self.model.predict(obs)
+                obs, reward, done, truncated, info = self._eval_env.step(action)
+                img = self._eval_env.render()
+                video_writer.write(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+
+                if done:
+                    break
+
+            video_writer.release()
+            print(f"output video saved in {self._out_path}")
+
         return True
+
+
+
 
 
 def train():
     path = (
-        f"/tmp/{datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')}"
+        f"/home/jordan/thunderzero_logs/{datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')}"
     )
     create_sim_env = lambda: TimeLimit(
         SimulatorGymEnv(
@@ -77,21 +99,18 @@ def train():
         ),
         max_episode_steps=300,
     )  # set time limit to 5 real minutes per episode
-    vec_env = make_vec_env(create_sim_env, n_envs=6)
+    vec_env = make_vec_env(create_sim_env, n_envs=4)
+    video_callback = VideoRecorderCallback(out_path=path, eval_env=create_sim_env(), render_freq=100_000, n_eval_episodes=1)
+
     model = PPO(
         "MlpPolicy",
         vec_env,
         verbose=1,
-        device="cpu",
         tensorboard_log=f"{path}/tb_logs",
         learning_rate=5e-5,
+        use_sde=True
     )
-
-    eval_callback = TensorboardEvalCallback(
-        create_sim_env(), render_freq=500_000, n_eval_episodes=5
-    )
-
-    model.learn(total_timesteps=10_000_000, callback=eval_callback)
+    model.learn(total_timesteps=10_000_000, callback=video_callback)
 
     model.save(f"{path}/thunderzero_model.ckpt")
 

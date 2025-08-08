@@ -357,7 +357,9 @@ idna==3.10 \
 imageio==2.37.0 \
     --hash=sha256:11efa15b87bc7871b61590326b2d635439acc321cf7f8ce996f812543ce10eed \
     --hash=sha256:71b57b3669666272c818497aebba2b4c5f20d5b37c81720e5e1a56d59c492996
-    # via moviepy
+    # via
+    #   -r software/simulated_tests/requirements.in
+    #   moviepy
 imageio-ffmpeg==0.6.0 \
     --hash=sha256:02fa47c83703c37df6bfe4896aab339013f62bf02c5ebf2dce6da56af04ffc0a \
     --hash=sha256:196faa79366b4a82f95c0f4053191d2013f4714a715780f0ad2a68ff37483cc2 \
@@ -1278,7 +1280,9 @@ referencing==0.36.2 \
 requests==2.32.4 \
     --hash=sha256:27babd3cda2a6d50b30443204ee89830707d396671944c998b5975b031ac2b2c \
     --hash=sha256:27d0316682c8a29834d3264820024b62a36942083d52caf2f14c0591336d3422
-    # via ray
+    # via
+    #   -r software/simulated_tests/requirements.in
+    #   ray
 rpds-py==0.26.0 \
     --hash=sha256:0919f38f5542c0a87e7b4afcafab6fd2c15386632d249e9a087498571250abe3 \
     --hash=sha256:093d63b4b0f52d98ebae33b8c50900d3d67e0666094b1be7a12fffd7f65de74b \

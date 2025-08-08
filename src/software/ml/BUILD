@@ -47,5 +47,7 @@ py_binary(
         requirement("opencv-python"),
         requirement("numpy"),
         requirement("numpy-quaternion"),
+        requirement("imageio"),
+        requirement("requests")
     ],
 )

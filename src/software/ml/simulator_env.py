@@ -261,6 +261,15 @@ class SimulatorGymEnv(gym.Env):
 
         return 1.0 if sim_state.yellow_robots[0].can_kick_ball else 0
 
+    def _face_ball_orientation_reward(self, sim_state):
+        if not sim_state or not sim_state.yellow_robots or not sim_state.ball:
+            return 0.0
+
+        robot_heading_unit_vec = np.array([np.cos(sim_state.yellow_robots[0].r_z), np.sin(sim_state.yellow_robots[0].r_z)])
+        ball_to_robot_vec = np.array([sim_state.ball.p_x - sim_state.yellow_robots[0].p_x, sim_state.ball.p_y - sim_state.yellow_robots[0].p_y])
+        ball_to_robot_unit_vec = ball_to_robot_vec / np.linalg.norm(ball_to_robot_vec)
+        return robot_heading_unit_vec.dot(ball_to_robot_unit_vec)
+
     def _dribble_reward(self, sim_state, action):
         if (
             not sim_state
@@ -296,8 +305,9 @@ class SimulatorGymEnv(gym.Env):
     def _compute_reward(self, sim_state, action):
         return (
             # self._position_reward(sim_state) * 50
-            +self._goal_reward(sim_state) * 100
-            + self._distance_reward(sim_state)
+            + self._goal_reward(sim_state) * 100
+            + self._distance_reward(sim_state) * 0.1
+            + self._face_ball_orientation_reward(sim_state) * 0.1
             + self._possession_reward(sim_state)
             + self._dribble_reward(sim_state, action) * 5
             + self._kick_reward(sim_state, action) * 10
