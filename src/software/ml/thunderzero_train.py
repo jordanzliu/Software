@@ -3,8 +3,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.noise import NormalActionNoise
-from software.ml.simulator_env import SimulatorGymEnv, ActionIndex
+from software.ml.simulator_env import SimulatorGymEnv
 from stable_baselines3.common.logger import Video
 import uuid
 import time
@@ -14,10 +13,17 @@ import torch
 import numpy as np
 import gymnasium as gym
 
+
 class VideoRecorderCallback(BaseCallback):
-    def __init__(self, out_path: str, eval_env: gym.Env, render_freq: int, n_eval_episodes: int = 1, deterministic: bool = True):
-        """
-        Records a video of an agent's trajectory traversing ``eval_env`` and logs it to TensorBoard
+    def __init__(
+        self,
+        out_path: str,
+        eval_env: gym.Env,
+        render_freq: int,
+        n_eval_episodes: int = 1,
+        deterministic: bool = True,
+    ):
+        """Records a video of an agent's trajectory traversing ``eval_env`` and logs it to TensorBoard
 
         :param eval_env: A gym environment from which the trajectory is recorded
         :param render_freq: Render the agent's trajectory every eval_freq call of the callback.
@@ -36,8 +42,7 @@ class VideoRecorderCallback(BaseCallback):
             screens = []
 
             def grab_screens(_locals, _globals) -> None:
-                """
-                Renders the environment in its current state, recording the screen in the captured `screens` list
+                """Renders the environment in its current state, recording the screen in the captured `screens` list
 
                 :param _locals: A dictionary containing all local variables of the callback's scope
                 :param _globals: A dictionary containing all global variables of the callback's scope
@@ -68,7 +73,10 @@ class VideoRecorderCallback(BaseCallback):
             img = self._eval_env.render()
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             video_writer = cv2.VideoWriter(
-                f"{self._out_path}/step_{self.n_calls}.mp4", fourcc, 10.0, (img.shape[1], img.shape[0])
+                f"{self._out_path}/step_{self.n_calls}.mp4",
+                fourcc,
+                10.0,
+                (img.shape[1], img.shape[0]),
             )
 
             for i in range(1000):
@@ -86,13 +94,8 @@ class VideoRecorderCallback(BaseCallback):
         return True
 
 
-
-
-
 def train():
-    path = (
-        f"/home/jordan/thunderzero_logs/{datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')}"
-    )
+    path = f"/home/jordan/thunderzero_logs/{datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')}"
     create_sim_env = lambda: TimeLimit(
         SimulatorGymEnv(
             simulator_runtime_dir=f"{path}/thunderbots_simulator/{uuid.uuid4().__str__()[:8]}"
@@ -100,7 +103,9 @@ def train():
         max_episode_steps=300,
     )  # set time limit to 5 real minutes per episode
     vec_env = make_vec_env(create_sim_env, n_envs=4)
-    video_callback = VideoRecorderCallback(out_path=path, eval_env=create_sim_env(), render_freq=100_000, n_eval_episodes=1)
+    video_callback = VideoRecorderCallback(
+        out_path=path, eval_env=create_sim_env(), render_freq=100_000, n_eval_episodes=1
+    )
 
     model = PPO(
         "MlpPolicy",
@@ -108,7 +113,7 @@ def train():
         verbose=1,
         tensorboard_log=f"{path}/tb_logs",
         learning_rate=5e-5,
-        use_sde=True
+        use_sde=True,
     )
     model.learn(total_timesteps=10_000_000, callback=video_callback)
 

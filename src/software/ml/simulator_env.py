@@ -15,6 +15,15 @@ from proto.message_translation.tbots_protobuf import create_world_state
 import software.python_bindings as tbots_cpp
 from extlibs.er_force_sim.src.protobuf.world_pb2 import *
 from software.ml.utils import transform_to_robot_frame
+from software.ml.reward_functions import (
+    is_ball_in_enemy_goal,
+    goal_reward,
+    distance_reward,
+    possession_reward,
+    face_ball_orientation_reward,
+    dribble_reward,
+    kick_reward,
+)
 
 
 class ActionIndex(IntEnum):
@@ -194,123 +203,15 @@ class SimulatorGymEnv(gym.Env):
 
         return primitive_set
 
-    def _get_enemy_goal_area(self):
-        """Helper function to compute enemy goal area rectangle"""
-        if not self.ssl_geometry:
-            return 6.0, 6.18, -0.9, 0.9  # fallback values
-
-        field = self.ssl_geometry.field
-        field_length = field.field_length / 1000  # convert mm to m
-        goal_width = field.goal_width / 1000
-        goal_depth = field.goal_depth / 1000
-
-        # Enemy goal is at positive X end
-        x_min = field_length / 2
-        x_max = field_length / 2 + goal_depth
-        y_min = -goal_width / 2
-        y_max = goal_width / 2
-
-        return x_min, x_max, y_min, y_max
-
-    def _is_ball_in_enemy_goal(self, sim_state):
-        """Returns true if ball is in enemy goal area"""
-        if not sim_state or not sim_state.ball:
-            return False
-
-        ball_x = sim_state.ball.p_x
-        ball_y = sim_state.ball.p_y
-
-        x_min, x_max, y_min, y_max = self._get_enemy_goal_area()
-        return x_min <= ball_x <= x_max and y_min <= ball_y <= y_max
-
-    def _position_reward(self, sim_state):
-        """Ball position reward (0 to 1) based on field position"""
-        if not sim_state or not sim_state.ball or not self.ssl_geometry:
-            return 0.0
-
-        ball_x = sim_state.ball.p_x
-        field_length = self.ssl_geometry.field.field_length / 1000  # convert mm to m
-        friendly_goal_x = -field_length / 2
-        enemy_goal_x = field_length / 2
-
-        position_reward = (ball_x - friendly_goal_x) / (enemy_goal_x - friendly_goal_x)
-        return max(0.0, min(1.0, position_reward))
-
-    def _goal_reward(self, sim_state):
-        """Goal area reward (10 if ball in enemy goal)"""
-        return 1.0 if self._is_ball_in_enemy_goal(sim_state) else 0.0
-
-    def _distance_reward(self, sim_state):
-        """Distance-based reward (0 to 0.1) for robot proximity to ball"""
-        if not sim_state or not sim_state.yellow_robots or not sim_state.ball:
-            return 0.0
-
-        ball_x = sim_state.ball.p_x
-        ball_y = sim_state.ball.p_y
-
-        robot = sim_state.yellow_robots[0]
-        robot_x = robot.p_x
-        robot_y = robot.p_y
-
-        distance = np.sqrt((robot_x - ball_x) ** 2 + (robot_y - ball_y) ** 2)
-        return max(0.0, (1.0 - distance / 1.0))
-
-    def _possession_reward(self, sim_state):
-        if not sim_state or not sim_state.yellow_robots or not sim_state.ball:
-            return 0.0
-
-        return 1.0 if sim_state.yellow_robots[0].can_kick_ball else 0
-
-    def _face_ball_orientation_reward(self, sim_state):
-        if not sim_state or not sim_state.yellow_robots or not sim_state.ball:
-            return 0.0
-
-        robot_heading_unit_vec = np.array([np.cos(sim_state.yellow_robots[0].r_z), np.sin(sim_state.yellow_robots[0].r_z)])
-        ball_to_robot_vec = np.array([sim_state.ball.p_x - sim_state.yellow_robots[0].p_x, sim_state.ball.p_y - sim_state.yellow_robots[0].p_y])
-        ball_to_robot_unit_vec = ball_to_robot_vec / np.linalg.norm(ball_to_robot_vec)
-        return robot_heading_unit_vec.dot(ball_to_robot_unit_vec)
-
-    def _dribble_reward(self, sim_state, action):
-        if (
-            not sim_state
-            or not sim_state.yellow_robots
-            or not sim_state.ball
-            or action is None
-        ):
-            return 0.0
-
-        return (
-            1.0
-            if sim_state.yellow_robots[0].can_kick_ball
-            and action[ActionIndex.AUTO_DRIBBLE] > 0.5
-            else 0
-        )
-
-    def _kick_reward(self, sim_state, action):
-        if (
-            not sim_state
-            or not sim_state.yellow_robots
-            or not sim_state.ball
-            or action is None
-        ):
-            return 0.0
-
-        return (
-            1.0
-            if sim_state.yellow_robots[0].can_kick_ball
-            and action[ActionIndex.AUTO_KICK] > 0.5
-            else 0.0
-        )
-
     def _compute_reward(self, sim_state, action):
         return (
-            # self._position_reward(sim_state) * 50
-            + self._goal_reward(sim_state) * 100
-            + self._distance_reward(sim_state) * 0.1
-            + self._face_ball_orientation_reward(sim_state) * 0.1
-            + self._possession_reward(sim_state)
-            + self._dribble_reward(sim_state, action) * 5
-            + self._kick_reward(sim_state, action) * 10
+            # position_reward(sim_state, self.ssl_geometry) * 50
+            +goal_reward(sim_state, self.ssl_geometry) * 100
+            + distance_reward(sim_state) * 0.1
+            + face_ball_orientation_reward(sim_state) * 0.1
+            + possession_reward(sim_state)
+            + dribble_reward(sim_state, action) * 5
+            + kick_reward(sim_state, action) * 10
         )
 
     def reset(self, seed=None, options=None):
@@ -406,7 +307,7 @@ class SimulatorGymEnv(gym.Env):
 
         obs = self._get_obs(self.sim_state)
         reward = self._compute_reward(self.sim_state, action)
-        terminated = self._is_ball_in_enemy_goal(self.sim_state)
+        terminated = is_ball_in_enemy_goal(self.sim_state, self.ssl_geometry)
         truncated = False
         info = {}
         return obs, reward, terminated, truncated, info

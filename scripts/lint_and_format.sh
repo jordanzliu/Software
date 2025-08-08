@@ -72,41 +72,6 @@ function run_ruff() {
     fi
 }
 
-function run_code_spell(){
-    mkdir -p $CURR_DIR/dictionary
-    http_code=$(curl -sw '%{http_code}' https://raw.githubusercontent.com/codespell-project/codespell/v1.14.0/codespell_lib/data/dictionary.txt --output $CURR_DIR/dictionary/dictionary.txt)
-
-    if [[ "$http_code" != 200 ]]; then
-        printf "\n***Failed to download codespell dictionary!***\n\n"
-	    if [ ! -f $CURR_DIR/dictionary/edited_dictionary.txt ]; then 
-	        printf "\n***Failed to load codespell dictonary from cache!***\n\n"
-	        exit 1
-	    fi
-	    printf "Loading Codespell dictionary from cache!\n\n"
-    else
-        sed "/atleast/d" $CURR_DIR/dictionary/dictionary.txt > $CURR_DIR/dictionary/edited_dictionary.txt #removing spell fixes that include the word 'atleast' from codespell dictionary 
-        rm $CURR_DIR/dictionary/dictionary.txt #remove the original dictionary.txt
-    fi
-
-    printf "Fixing spelling...\n\n"
-    cd $CURR_DIR/../src/software && codespell -w --skip="1,2,0" -D $CURR_DIR/dictionary/edited_dictionary.txt -I $CURR_DIR/codespell_ignored_words.txt # Skip binaries
-    cd $CURR_DIR/../src/shared && codespell -w -D $CURR_DIR/dictionary/edited_dictionary.txt
-    cd $CURR_DIR/../docs && codespell -w --skip="*.png,*.svg" -D $CURR_DIR/dictionary/edited_dictionary.txt # Skip images
-
-    if [[ "$?" != 0 ]]; then
-        printf "\n***Failed to fix spelling!***\n\n"
-        exit 1
-    fi
-}
-
-function run_md_toc() {
-    printf "Adding table of contents to Markdown files...\n\n"
-    for file in $CURR_DIR/../docs/*.md
-    do
-      /opt/tbotspython/bin/python3 -m md_toc --in-place --no-list-coherence --skip-lines 1 github $file
-    done
-}
-
 function run_git_diff_check(){
     printf "Checking for merge conflict markers...\n\n"
     cd $CURR_DIR && git -c "core.whitespace=-trailing-space" --no-pager diff --check

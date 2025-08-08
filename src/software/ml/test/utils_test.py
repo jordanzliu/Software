@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-from software.ml.utils import transform_to_robot_frame
+from software.ml.utils import transform_to_robot_frame, get_enemy_goal_area
+from proto.ssl_vision_geometry_pb2 import SSL_GeometryData
 
 
 class MockSimRobot:
@@ -45,6 +46,31 @@ class TestTransformToRobotFrame(unittest.TestCase):
         self.assertAlmostEqual(rel_x, expected_x, places=6)
         self.assertAlmostEqual(rel_y, expected_y, places=6)
         self.assertAlmostEqual(rel_theta, expected_theta, places=6)
+
+
+class TestGetEnemyGoalArea(unittest.TestCase):
+    def test_standard_field(self):
+        """Test with standard SSL field dimensions"""
+        geometry_data = SSL_GeometryData()
+        geometry_data.field.field_length = 12000  # 12m in mm
+        geometry_data.field.goal_width = 1800  # 1.8m in mm
+        geometry_data.field.goal_depth = 180  # 0.18m in mm
+
+        x_min, x_max, y_min, y_max = get_enemy_goal_area(geometry_data)
+
+        self.assertAlmostEqual(x_min, 6.0, places=6)
+        self.assertAlmostEqual(x_max, 6.18, places=6)
+        self.assertAlmostEqual(y_min, -0.9, places=6)
+        self.assertAlmostEqual(y_max, 0.9, places=6)
+
+    def test_fallback_values(self):
+        """Test fallback values when geometry data is None"""
+        x_min, x_max, y_min, y_max = get_enemy_goal_area(None)
+
+        self.assertEqual(x_min, 6.0)
+        self.assertEqual(x_max, 6.18)
+        self.assertEqual(y_min, -0.9)
+        self.assertEqual(y_max, 0.9)
 
 
 if __name__ == "__main__":

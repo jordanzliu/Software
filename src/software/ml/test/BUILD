@@ -11,3 +11,13 @@ py_test(
         requirement("numpy-quaternion"),
     ],
 )
+
+py_test(
+    name = "reward_functions_test",
+    srcs = ["reward_functions_test.py"],
+    deps = [
+        "//proto:import_all_protos",
+        "//software/ml:reward_functions",
+        requirement("numpy"),
+    ],
+)

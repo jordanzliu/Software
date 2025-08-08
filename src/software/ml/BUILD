@@ -3,6 +3,20 @@ package(default_visibility = ["//visibility:public"])
 load("@simulated_tests_deps//:requirements.bzl", "requirement")
 
 py_library(
+    name = "reward_functions",
+    srcs = ["reward_functions.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":utils",
+        "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
+        "//proto:import_all_protos",
+        "//proto/message_translation:py_tbots_protobuf",
+        requirement("numpy"),
+        requirement("numpy-quaternion"),
+    ],
+)
+
+py_library(
     name = "simulator_env",
     srcs = ["simulator_env.py"],
     visibility = ["//visibility:public"],
@@ -48,6 +62,6 @@ py_binary(
         requirement("numpy"),
         requirement("numpy-quaternion"),
         requirement("imageio"),
-        requirement("requests")
+        requirement("requests"),
     ],
 )
