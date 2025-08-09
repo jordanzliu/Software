@@ -70,15 +70,16 @@ def train():
         PPOConfig()
         .environment(env="thunderzero_env", env_config={"sim_path": path})
         .framework("torch")
-        .env_runners(num_env_runners=6, num_envs_per_env_runner=1)
+        .env_runners(num_env_runners=12, num_envs_per_env_runner=1)
         .training(num_epochs=10, lr=5e-5, train_batch_size_per_learner=1000)
         .resources(
             num_gpus=1,
         )
     )
     algo = config.build_algo()
-    for i in range(100):
-        print(algo.train())
+    for i in range(1000):
+        result = algo.train()
+        print(f"lifetime env steps: {result['num_env_steps_sampled_lifetime']}")
 
     # Final video recording
     env = SimulatorGymEnv(f"{path}/sim_rundir")
