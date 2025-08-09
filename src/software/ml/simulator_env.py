@@ -20,7 +20,7 @@ from software.ml.reward_functions import (
     dribble_reward,
     kick_reward,
 )
-from software.ml.utils import render_simulator
+from software.ml.utils import render_simulator, create_observation
 
 
 class ActionIndex(IntEnum):
@@ -86,60 +86,7 @@ class SimulatorGymEnv(gym.Env):
         self.simulator_state_buffer = ThreadSafeBuffer(10, SimulatorState)
 
     def _get_obs(self, sim_state):
-        # Default values if no data available
-        friendly_data = np.array([0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
-        enemy_data = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=np.float32)
-        ball_data = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
-
-        if sim_state and sim_state.yellow_robots:
-            yellow_robot = sim_state.yellow_robots[0]
-
-            # Yellow robot data
-            friendly_data = np.array(
-                [
-                    yellow_robot.p_x,
-                    yellow_robot.p_y,
-                    yellow_robot.v_x,
-                    yellow_robot.v_y,
-                    np.cos(yellow_robot.r_z),
-                    np.sin(yellow_robot.r_z),
-                    1.0 if yellow_robot.can_kick_ball else 0.0,
-                ],
-                dtype=np.float32,
-            )
-
-            # Relative position to blue robot
-            if sim_state.blue_robots:
-                blue_robot = sim_state.blue_robots[0]
-                rel_x = blue_robot.p_x - yellow_robot.p_x
-                rel_y = blue_robot.p_y - yellow_robot.p_y
-
-                enemy_data = np.array(
-                    [
-                        rel_x,
-                        rel_y,
-                        blue_robot.p_x,
-                        blue_robot.p_y,
-                        blue_robot.v_x,
-                        blue_robot.v_y,
-                        np.cos(blue_robot.r_z),
-                        np.sin(blue_robot.r_z),
-                    ],
-                    dtype=np.float32,
-                )
-
-            # Relative position to yellow robot
-            if sim_state.ball:
-                ball = sim_state.ball
-                rel_x = ball.p_x - yellow_robot.p_x
-                rel_y = ball.p_y - yellow_robot.p_y
-
-                ball_data = np.array(
-                    [rel_x, rel_y, ball.p_x, ball.p_y, ball.v_x, ball.v_y],
-                    dtype=np.float32,
-                )
-
-        return np.concatenate([friendly_data, enemy_data, ball_data])
+        return create_observation(sim_state, is_blue=False)
 
     def _convert_action_to_primitive_set(self, action):
         # Scale velocities from [-1, 1] to actual robot limits
@@ -275,7 +222,7 @@ class SimulatorGymEnv(gym.Env):
         self.ssl_geometry = self.ssl_wrapper_buffer.get(
             block=True, return_cached=False
         ).geometry
-        return self._get_obs(self.sim_state), {}
+        return create_observation(self.sim_state, is_blue=False), {}
 
     def step(self, action):
         primitive_set = self._convert_action_to_primitive_set(action)
@@ -306,7 +253,7 @@ class SimulatorGymEnv(gym.Env):
             block=True, return_cached=False
         ).geometry
 
-        obs = self._get_obs(self.sim_state)
+        obs = create_observation(self.sim_state, is_blue=False)
         reward = self._compute_reward(self.sim_state, action)
         terminated = is_ball_in_enemy_goal(self.sim_state, self.ssl_geometry)
         truncated = False
