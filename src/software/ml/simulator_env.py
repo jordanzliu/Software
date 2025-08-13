@@ -20,7 +20,8 @@ from software.ml.reward_functions import (
     dribble_reward,
     kick_reward,
 )
-from software.ml.utils import render_simulator, create_observation
+from software.ml.utils import create_observation
+from software.ml.render import render_simulator
 
 
 class ActionIndex(IntEnum):
@@ -83,7 +84,8 @@ class SimulatorGymEnv(gym.Env):
             1, WorldStateReceivedTrigger
         )
         self.ssl_wrapper_buffer = ThreadSafeBuffer(10, SSL_WrapperPacket)
-        self.simulator_state_buffer = ThreadSafeBuffer(10, SimulatorState)
+        self.simulator_state_buffer = ThreadSafeBuffer(1, SimulatorState)
+        self.last_action = None
 
     def _get_obs(self, sim_state):
         return create_observation(sim_state, is_blue=False)
@@ -257,12 +259,13 @@ class SimulatorGymEnv(gym.Env):
         reward = self._compute_reward(self.sim_state, action)
         terminated = is_ball_in_enemy_goal(self.sim_state, self.ssl_geometry)
         truncated = False
+        self.last_action = action
         info = {}
         return obs, reward, terminated, truncated, info
 
     def render(self):
         sim_state = self.simulator_state_buffer.get(block=False)
-        return render_simulator(sim_state, self.ssl_geometry)
+        return render_simulator(sim_state, self.ssl_geometry, self.last_action, is_blue=False)
 
     def close(self):
         self.simulator.__exit__(None, None, None)

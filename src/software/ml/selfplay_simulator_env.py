@@ -261,9 +261,9 @@ class SelfPlaySimulatorEnv(MultiAgentEnv):
 
         return obs, rewards, terminateds, truncateds, infos
 
-    def render(self):
+    def render(self, is_blue=False, action=None):
         sim_state = self.simulator_state_buffer.get(block=False)
-        return render_simulator(sim_state, self.ssl_geometry)
+        return render_simulator(sim_state, self.ssl_geometry, action, is_blue)
 
     def close(self):
         if self.simulator:

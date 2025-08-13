@@ -22,6 +22,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         ":utils",
+        ":render",
         "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
         "//proto:import_all_protos",
         "//proto/message_translation:py_tbots_protobuf",
@@ -61,6 +62,21 @@ py_library(
     srcs = ["utils.py"],
     visibility = ["//visibility:public"],
     deps = [
+        "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
+        "//proto:import_all_protos",
+        "//proto/message_translation:py_tbots_protobuf",
+        requirement("numpy"),
+        requirement("numpy-quaternion"),
+    ],
+)
+
+py_library(
+    name = "render",
+    srcs = ["render.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":utils",
+        ":reward_functions",
         "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
         "//proto:import_all_protos",
         "//proto/message_translation:py_tbots_protobuf",
