@@ -93,7 +93,7 @@ def dribble_reward(sim_state, action, is_blue=False):
 
     return (
         1.0
-        if robots[0].can_kick_ball and action[4] > 0.5  # AUTO_DRIBBLE index
+        if robots[0].can_kick_ball and action[28] > 0.5  # AUTO_DRIBBLE index
         else 0
     )
 
@@ -105,6 +105,6 @@ def kick_reward(sim_state, action, is_blue=False):
 
     return (
         1.0
-        if robots[0].can_kick_ball and action[3] > 0.5  # AUTO_KICK index
+        if robots[0].can_kick_ball and action[27] > 0.5  # AUTO_KICK index
         else 0.0
     )
