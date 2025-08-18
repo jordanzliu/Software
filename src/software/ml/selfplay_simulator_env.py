@@ -23,10 +23,11 @@ from software.ml.utils import render_simulator, create_observation
 
 
 class ActionIndex:
-    SPIN_CW = 25
-    SPIN_CCW = 26
-    AUTO_KICK = 27
-    AUTO_DRIBBLE = 28
+    VELOCITY_X = 0
+    VELOCITY_Y = 1
+    VELOCITY_ANGULAR = 2
+    AUTO_KICK = 3
+    AUTO_DRIBBLE = 4
 
 
 class SelfPlaySimulatorEnv(MultiAgentEnv):
@@ -39,8 +40,7 @@ class SelfPlaySimulatorEnv(MultiAgentEnv):
         self.ssl_geometry = None
 
         # Define action and observation spaces
-        # 5x5 grid for movement + spin CW + spin CCW + kicker + dribbler
-        self.action_space = spaces.MultiBinary(n=29)
+        self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
         self.observation_space = spaces.Box(
             low=-10, high=10, shape=(21,), dtype=np.float32
         )
@@ -57,28 +57,13 @@ class SelfPlaySimulatorEnv(MultiAgentEnv):
     def _get_obs(self, sim_state, is_blue=False):
         return create_observation(sim_state, is_blue)
 
-    def extract_movement_from_action(self, action):
-        action_grid = action[:25].reshape((5, 5))
-        action_coords = np.unravel_index(action_grid.argmax(), action_grid.shape)
-        # scale velocity to maximum of 3.0 m/s
-        vel_x = (action_coords[0] - 2) * 1.5
-        vel_y = (action_coords[1] - 2) * 1.5
-
-        vel_angular = (
-            0
-            if (action[ActionIndex.SPIN_CW] and action[ActionIndex.SPIN_CCW])
-            else 10
-            if action[ActionIndex.SPIN_CCW]
-            else -10
-            if action[ActionIndex.SPIN_CW]
-            else 0
-        )
-        return vel_x, vel_y, vel_angular
-
     def _convert_action_to_primitive_set(self, action, is_blue=False):
-        # Extract velocities from grid action
-        local_vx, local_vy, angular_velocity = self.extract_movement_from_action(action)
+        # Scale velocities
+        local_vx = action[ActionIndex.VELOCITY_X] * 3.0
+        local_vy = action[ActionIndex.VELOCITY_Y] * 3.0
+        angular_velocity = action[ActionIndex.VELOCITY_ANGULAR] * 10.0
 
+        robots = self.sim_state.blue_robots if is_blue else self.sim_state.yellow_robots
         # the robot movement is supposed to be in global cartesian coordinates
         velocity_x = -local_vx if is_blue else local_vx
         velocity_y = -local_vy if is_blue else local_vy
@@ -92,7 +77,7 @@ class SelfPlaySimulatorEnv(MultiAgentEnv):
         motor_control = MotorControl()
         motor_control.direct_velocity_control.CopyFrom(velocity_control)
         motor_control.dribbler_speed_rpm = (
-            12000 if action[ActionIndex.AUTO_DRIBBLE] else 0
+            12000 if action[ActionIndex.AUTO_DRIBBLE] > 0.5 else 0
         )
 
         chicker_control = PowerControl.ChickerControl()
@@ -100,7 +85,7 @@ class SelfPlaySimulatorEnv(MultiAgentEnv):
         auto_kick.autokick_speed_m_per_s = 5
         chicker_control.auto_chip_or_kick.CopyFrom(auto_kick)
         power_control = PowerControl()
-        if action[ActionIndex.AUTO_KICK]:
+        if action[ActionIndex.AUTO_KICK] > 0.5:
             power_control.chicker.CopyFrom(chicker_control)
 
         control_primitive = DirectControlPrimitive()

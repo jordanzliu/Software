@@ -21,8 +21,8 @@ py_library(
     srcs = ["simulator_env.py"],
     visibility = ["//visibility:public"],
     deps = [
-        ":render",
         ":utils",
+        ":render",
         "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
         "//proto:import_all_protos",
         "//proto/message_translation:py_tbots_protobuf",
@@ -75,8 +75,8 @@ py_library(
     srcs = ["render.py"],
     visibility = ["//visibility:public"],
     deps = [
-        ":reward_functions",
         ":utils",
+        ":reward_functions",
         "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
         "//proto:import_all_protos",
         "//proto/message_translation:py_tbots_protobuf",

@@ -1,6 +1,7 @@
 import torch
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.tune.registry import register_env
+from ray.rllib.callbacks.callbacks import RLlibCallback
 from gymnasium.wrappers import TimeLimit
 from software.ml.simulator_env import SimulatorGymEnv
 from pprint import pprint
@@ -19,7 +20,6 @@ def create_env(config):
         max_episode_steps=300,
     )
 
-
 def record_video(module, path, filename):
     # Final video recording
     env = SimulatorGymEnv(f"{path}/sim_rundir")
@@ -35,7 +35,9 @@ def record_video(module, path, filename):
         fwd_ins = {"obs": torch.Tensor([obs])}
         fwd_outputs = module.forward_exploration(fwd_ins)
         # This can be either deterministic or stochastic distribution.
-        action_dist = action_dist_class.from_logits(fwd_outputs["action_dist_inputs"])
+        action_dist = action_dist_class.from_logits(
+            fwd_outputs["action_dist_inputs"]
+        )
         action = action_dist.sample()[0].numpy()
         obs, reward, done, truncated, info = env.step(action)
         img = env.render()

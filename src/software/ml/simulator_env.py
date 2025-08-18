@@ -25,10 +25,11 @@ from software.ml.render import render_simulator
 
 
 class ActionIndex(IntEnum):
-    SPIN_CW = 25
-    SPIN_CCW = 26
-    AUTO_KICK = 27
-    AUTO_DRIBBLE = 28
+    VELOCITY_X = 0
+    VELOCITY_Y = 1
+    VELOCITY_ANGULAR = 2
+    AUTO_KICK = 3
+    AUTO_DRIBBLE = 4
 
 
 class ObservationIndex(IntEnum):
@@ -70,8 +71,7 @@ class SimulatorGymEnv(gym.Env):
         self.ssl_geometry = None
 
         # Define action space as Box
-        # 5x5 grid for movement + spin CW + spin CCW + kicker + dribbler
-        self.action_space = spaces.MultiBinary(n=29)
+        self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
         # Define observation space as Box
         self.observation_space = spaces.Box(
             low=-10, high=10, shape=(21,), dtype=np.float32
@@ -87,31 +87,16 @@ class SimulatorGymEnv(gym.Env):
         self.simulator_state_buffer = ThreadSafeBuffer(1, SimulatorState)
         self.last_action = None
 
-    def extract_movement_from_action(self, action: np.ndarray):
-        action_grid = action[:25].reshape((5, 5))
-        action_coords = np.unravel_index(action_grid.argmax(), action_grid.shape)
-        # scale velocity to maximum of 3.0 m/s
-        vel_x = (action_coords[0] - 2) * 1.5
-        vel_y = (action_coords[1] - 2) * 1.5
-
-        vel_angular = (
-            0
-            if (action[ActionIndex.SPIN_CW] and action[ActionIndex.SPIN_CCW])
-            else 10
-            if action[ActionIndex.SPIN_CCW]
-            else -10
-            if action[ActionIndex.SPIN_CW]
-            else 0
-        )
-        return vel_x, vel_y, vel_angular
-
     def _get_obs(self, sim_state):
         return create_observation(sim_state, is_blue=False)
 
     def _convert_action_to_primitive_set(self, action):
         # Scale velocities from [-1, 1] to actual robot limits
-        v_x, v_y, angular_velocity = self.extract_movement_from_action(action)
-        # 10.0 rad/s max angular speed
+        v_x = action[ActionIndex.VELOCITY_X] * 3.0  # 3.0 m/s max speed
+        v_y = action[ActionIndex.VELOCITY_Y] * 3.0  # 3.0 m/s max speed
+        angular_velocity = (
+            action[ActionIndex.VELOCITY_ANGULAR] * 10.0
+        )  # 10.0 rad/s max angular speed
 
         # Create DirectVelocityControl
         velocity_control = MotorControl.DirectVelocityControl()
@@ -280,9 +265,7 @@ class SimulatorGymEnv(gym.Env):
 
     def render(self):
         sim_state = self.simulator_state_buffer.get(block=False)
-        return render_simulator(
-            sim_state, self.ssl_geometry, self.last_action, is_blue=False
-        )
+        return render_simulator(sim_state, self.ssl_geometry, self.last_action, is_blue=False)
 
     def close(self):
         self.simulator.__exit__(None, None, None)

@@ -10,15 +10,12 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 
-
 def render_simulator(sim_state, ssl_geometry, action=None, is_blue=False):
     """Render simulator state with SSL geometry data and reward panel"""
     if not sim_state or not ssl_geometry:
         return np.zeros((800, 1200, 3), dtype=np.uint8)
 
-    fig, (ax, reward_ax) = plt.subplots(
-        1, 2, figsize=(10, 4), dpi=200, gridspec_kw={"width_ratios": [3, 1]}
-    )
+    fig, (ax, reward_ax) = plt.subplots(1, 2, figsize=(10, 4), dpi=200, gridspec_kw={'width_ratios': [3, 1]})
 
     # Draw field lines using SSL geometry data
     field = ssl_geometry.field
@@ -114,12 +111,7 @@ def render_simulator(sim_state, ssl_geometry, action=None, is_blue=False):
             vel_scale = 2 * robot_radius
             vel_x = action[0] * vel_scale  # VELOCITY_X
             vel_y = action[1] * vel_scale  # VELOCITY_Y
-            ax.plot(
-                [robot.p_x, robot.p_x + vel_x],
-                [robot.p_y, robot.p_y + vel_y],
-                "r-",
-                linewidth=1.5,
-            )
+            ax.plot([robot.p_x, robot.p_x + vel_x], [robot.p_y, robot.p_y + vel_y], "r-", linewidth=1.5)
 
     # Blue robots (enemy)
     for robot in sim_state.blue_robots:
@@ -163,23 +155,14 @@ def render_simulator(sim_state, ssl_geometry, action=None, is_blue=False):
         "Distance": distance_reward(sim_state, is_blue),
         "Possession": possession_reward(sim_state, is_blue),
         "Face Ball": face_ball_orientation_reward(sim_state, is_blue),
-        "Dribble": dribble_reward(sim_state, action, is_blue)
-        if action is not None
-        else 0.0,
+        "Dribble": dribble_reward(sim_state, action, is_blue) if action is not None else 0.0,
         "Kick": kick_reward(sim_state, action, is_blue) if action is not None else 0.0,
     }
 
     # Display rewards
     y_pos = 0.9
     for name, value in rewards.items():
-        reward_ax.text(
-            0.05,
-            y_pos,
-            f"{name}: {value:.3f}",
-            color="black",
-            fontsize=10,
-            transform=reward_ax.transAxes,
-        )
+        reward_ax.text(0.05, y_pos, f"{name}: {value:.3f}", color="black", fontsize=10, transform=reward_ax.transAxes)
         y_pos -= 0.15
 
     fig.canvas.draw()

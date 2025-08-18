@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def create_observation(sim_state, is_blue=False):
     """Create observation from sim state with global positions, relative positions, and global orientation unit vectors"""
     robots = sim_state.blue_robots if is_blue else sim_state.yellow_robots
@@ -21,18 +20,11 @@ def create_observation(sim_state, is_blue=False):
         robot_vy = -robot.v_y if is_blue else robot.v_y
         robot_heading = robot.r_z + np.pi if is_blue else robot.r_z
 
-        friendly_data = np.array(
-            [
-                robot_x,
-                robot_y,
-                robot_vx,
-                robot_vy,
-                np.cos(robot_heading),
-                np.sin(robot_heading),
-                1.0 if robot.can_kick_ball else 0.0,
-            ],
-            dtype=np.float32,
-        )
+        friendly_data = np.array([
+            robot_x, robot_y, robot_vx, robot_vy,
+            np.cos(robot_heading), np.sin(robot_heading),
+            1.0 if robot.can_kick_ball else 0.0
+        ], dtype=np.float32)
 
         # Enemy robot data
         if enemy_robots:
@@ -46,19 +38,10 @@ def create_observation(sim_state, is_blue=False):
             rel_x = enemy_x - robot_x
             rel_y = enemy_y - robot_y
 
-            enemy_data = np.array(
-                [
-                    rel_x,
-                    rel_y,
-                    enemy_x,
-                    enemy_y,
-                    enemy_vx,
-                    enemy_vy,
-                    np.cos(enemy_heading),
-                    np.sin(enemy_heading),
-                ],
-                dtype=np.float32,
-            )
+            enemy_data = np.array([
+                rel_x, rel_y, enemy_x, enemy_y, enemy_vx, enemy_vy,
+                np.cos(enemy_heading), np.sin(enemy_heading)
+            ], dtype=np.float32)
 
         # Ball data
         if sim_state.ball:
@@ -71,9 +54,7 @@ def create_observation(sim_state, is_blue=False):
             rel_x = ball_x - robot_x
             rel_y = ball_y - robot_y
 
-            ball_data = np.array(
-                [rel_x, rel_y, ball_x, ball_y, ball_vx, ball_vy], dtype=np.float32
-            )
+            ball_data = np.array([rel_x, rel_y, ball_x, ball_y, ball_vx, ball_vy], dtype=np.float32)
 
     return np.concatenate([friendly_data, enemy_data, ball_data])
 
