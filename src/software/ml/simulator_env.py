@@ -17,8 +17,9 @@ from software.ml.reward_functions import (
     distance_reward,
     possession_reward,
     face_ball_orientation_reward,
-    dribble_reward,
     kick_reward,
+    ball_toward_goal_reward,
+    position_reward,
 )
 from software.ml.utils import create_observation
 from software.ml.render import render_simulator
@@ -90,25 +91,40 @@ class SimulatorGymEnv(gym.Env):
     def _get_obs(self, sim_state):
         return create_observation(sim_state, is_blue=False)
 
-    def _convert_action_to_primitive_set(self, action):
-        # Scale velocities from [-1, 1] to actual robot limits
-        v_x = action[ActionIndex.VELOCITY_X] * 3.0  # 3.0 m/s max speed
-        v_y = action[ActionIndex.VELOCITY_Y] * 3.0  # 3.0 m/s max speed
+    def _convert_action_to_primitive_set(self, sim_state, action):
+        if not sim_state.yellow_robots:
+            return PrimitiveSet()
+
+        # get the unit vector of the commanded velocity
+        velocity_command_vec = np.array(
+            [action[ActionIndex.VELOCITY_X], action[ActionIndex.VELOCITY_Y]]
+        )
+        velocity_command_vec /= np.linalg.norm(velocity_command_vec)
+        # scale by velocity limits
+        velocity_command_vec *= 3.0
         angular_velocity = (
             action[ActionIndex.VELOCITY_ANGULAR] * 10.0
         )  # 10.0 rad/s max angular speed
 
+        # transform velocity into robot frame for the direct velocity primitive
+        robot = sim_state.yellow_robots[0]
+        robot_x_vector = np.array([np.cos(robot.r_z), np.sin(robot.r_z)])
+        robot_y_vector = np.array([np.sin(robot.r_z), -np.cos(robot.r_z)])
+        vel_x_robot_frame, vel_y_robot_frame = (
+            np.vstack((robot_x_vector, robot_y_vector)).T @ velocity_command_vec
+        )
+
         # Create DirectVelocityControl
         velocity_control = MotorControl.DirectVelocityControl()
-        velocity_control.velocity.x_component_meters = v_x
-        velocity_control.velocity.y_component_meters = v_y
+        velocity_control.velocity.x_component_meters = vel_x_robot_frame
+        velocity_control.velocity.y_component_meters = vel_y_robot_frame
         velocity_control.angular_velocity.radians_per_second = angular_velocity
 
         # Create MotorControl with DirectVelocityControl
         motor_control = MotorControl()
         motor_control.direct_velocity_control.CopyFrom(velocity_control)
         motor_control.dribbler_speed_rpm = (
-            12000 if action[ActionIndex.AUTO_DRIBBLE] > 0.5 else 0
+            12000 if action[ActionIndex.AUTO_DRIBBLE] > 0 else 0
         )
 
         # Create power control primitive for auto kick
@@ -118,7 +134,7 @@ class SimulatorGymEnv(gym.Env):
         auto_kick.autokick_speed_m_per_s = 5
         chicker_control.auto_chip_or_kick.CopyFrom(auto_kick)
         power_control = PowerControl()
-        if action[ActionIndex.AUTO_KICK] > 0.5:
+        if action[ActionIndex.AUTO_KICK] > 0.0:
             power_control.chicker.CopyFrom(chicker_control)
 
         # Create DirectControlPrimitive
@@ -140,13 +156,15 @@ class SimulatorGymEnv(gym.Env):
 
     def _compute_reward(self, sim_state, action, is_blue=False):
         return (
-            # position_reward(sim_state, self.ssl_geometry) * 50
-            +goal_reward(sim_state, self.ssl_geometry, is_blue) * 100
-            + distance_reward(sim_state, is_blue) * 0.1
-            + face_ball_orientation_reward(sim_state, is_blue) * 0.1
-            + possession_reward(sim_state, is_blue)
-            + dribble_reward(sim_state, action, is_blue) * 5
-            + kick_reward(sim_state, action, is_blue) * 10
+            position_reward(sim_state, self.ssl_geometry)
+            + goal_reward(sim_state, self.ssl_geometry, is_blue) * 10
+            + distance_reward(sim_state, max_distance=1.0, is_blue=is_blue) * 0.1
+            + distance_reward(sim_state, max_distance=0.1, is_blue=is_blue) * 0.1
+            + face_ball_orientation_reward(sim_state, is_blue) * 0.05
+            + possession_reward(sim_state, is_blue) * 0.1
+            # + dribble_reward(sim_state, action, is_blue)
+            + kick_reward(sim_state, action, is_blue)
+            + ball_toward_goal_reward(sim_state, self.ssl_geometry, is_blue)
         )
 
     def reset(self, seed=None, options=None):
@@ -197,14 +215,12 @@ class SimulatorGymEnv(gym.Env):
             ball_location=ball_initial_pos,
             ball_velocity=tbots_cpp.Vector(0, 0),
         )
-        print("sending reset world state")
         world_state_received = None
         while world_state_received is None:
             self.simulator_io.send_proto(WorldState, initial_world_state)
             world_state_received = self.world_state_received_buffer.get(
                 block=False, return_cached=False
             )
-        print("world state reset acked")
 
         # tick the simulator until something happens
         world = None
@@ -212,7 +228,6 @@ class SimulatorGymEnv(gym.Env):
             tick = SimulatorTick(milliseconds=100)
             self.simulator_io.send_proto(SimulatorTick, tick)
             world = self.simulator_state_buffer.get(block=False, return_cached=False)
-        print("simulator is alive")
 
         # tick the simulator once for everything to show up
         tick = SimulatorTick(milliseconds=100)
@@ -227,7 +242,7 @@ class SimulatorGymEnv(gym.Env):
         return create_observation(self.sim_state, is_blue=False), {}
 
     def step(self, action):
-        primitive_set = self._convert_action_to_primitive_set(action)
+        primitive_set = self._convert_action_to_primitive_set(self.sim_state, action)
         self.yellow_io.send_proto(PrimitiveSet, primitive_set)
         # tick the simulator at 100hz but only plan at 10hz
         for i in range(9):
@@ -265,7 +280,9 @@ class SimulatorGymEnv(gym.Env):
 
     def render(self):
         sim_state = self.simulator_state_buffer.get(block=False)
-        return render_simulator(sim_state, self.ssl_geometry, self.last_action, is_blue=False)
+        return render_simulator(
+            sim_state, self.ssl_geometry, self.last_action, is_blue=False
+        )
 
     def close(self):
         self.simulator.__exit__(None, None, None)

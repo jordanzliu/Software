@@ -21,8 +21,8 @@ py_library(
     srcs = ["simulator_env.py"],
     visibility = ["//visibility:public"],
     deps = [
-        ":utils",
         ":render",
+        ":utils",
         "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
         "//proto:import_all_protos",
         "//proto/message_translation:py_tbots_protobuf",
@@ -75,8 +75,8 @@ py_library(
     srcs = ["render.py"],
     visibility = ["//visibility:public"],
     deps = [
-        ":utils",
         ":reward_functions",
+        ":utils",
         "//extlibs/er_force_sim/src/protobuf:erforce_py_proto",
         "//proto:import_all_protos",
         "//proto/message_translation:py_tbots_protobuf",
@@ -100,6 +100,7 @@ py_binary(
         requirement("numpy-quaternion"),
         requirement("imageio"),
         requirement("requests"),
+        requirement("torch"),
     ],
 )
 

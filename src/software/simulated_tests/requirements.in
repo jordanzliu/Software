@@ -6,6 +6,5 @@ tensorboard
 ray
 ray[rllib, tune]
 numpy-quaternion
-moviepy
 imageio
 requests

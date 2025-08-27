@@ -8,14 +8,17 @@ from software.ml.reward_functions import (
     face_ball_orientation_reward,
     dribble_reward,
     kick_reward,
+    ball_toward_goal_reward,
 )
 from proto.ssl_vision_geometry_pb2 import SSL_GeometryData
 
 
 class MockBall:
-    def __init__(self, p_x, p_y):
+    def __init__(self, p_x, p_y, v_x=0.0, v_y=0.0):
         self.p_x = p_x
         self.p_y = p_y
+        self.v_x = v_x
+        self.v_y = v_y
 
 
 class MockRobot:
@@ -192,6 +195,24 @@ class TestRewardFunctions(unittest.TestCase):
         sim_state = MockSimState(ball=MockBall(0.0, 0.0), blue_robots=[robot])
         action = [0, 0, 0, 1.0, 0]
         reward = kick_reward(sim_state, action, is_blue=True)
+        self.assertEqual(reward, 1.0)
+
+    def test_ball_toward_goal_reward_not_moving(self):
+        ball = MockBall(0.0, 0.0, v_x=0.0, v_y=0.0)
+        sim_state = MockSimState(ball=ball)
+        reward = ball_toward_goal_reward(sim_state, self.geometry)
+        self.assertEqual(reward, 0.0)
+
+    def test_ball_toward_goal_reward_toward_yellow_goal(self):
+        ball = MockBall(0.0, 0.0, v_x=-5.0, v_y=0.0)
+        sim_state = MockSimState(ball=ball)
+        reward = ball_toward_goal_reward(sim_state, self.geometry)
+        self.assertEqual(reward, -1.0)
+
+    def test_ball_toward_goal_reward_toward_blue_goal(self):
+        ball = MockBall(0.0, 0.0, v_x=5.0, v_y=0.0)
+        sim_state = MockSimState(ball=ball)
+        reward = ball_toward_goal_reward(sim_state, self.geometry)
         self.assertEqual(reward, 1.0)
 
 

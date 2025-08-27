@@ -44,21 +44,30 @@ def goal_reward(sim_state, ssl_geometry, is_blue=False):
     return 1.0 if is_ball_in_enemy_goal(sim_state, ssl_geometry, is_blue) else 0.0
 
 
-def distance_reward(sim_state, is_blue=False):
-    """Distance-based reward (0 to 0.1) for robot proximity to ball"""
+def distance_reward(sim_state, max_distance=1.0, is_blue=False):
+    """Distance-based reward (0 to 1) for robot proximity to ball"""
     robots = sim_state.blue_robots if is_blue else sim_state.yellow_robots
     if not sim_state or not robots or not sim_state.ball:
         return 0.0
 
-    ball_x = sim_state.ball.p_x
-    ball_y = sim_state.ball.p_y
+    ball_pos = np.array([sim_state.ball.p_x, sim_state.ball.p_y])
 
     robot = robots[0]
     robot_x = robot.p_x
     robot_y = robot.p_y
+    # calculated with a dribbler width of 0.07m and a radius of 0.09m
+    # see extlibs/er_force_sim/src/protobuf/robot.cpp for default robot dimensions
+    center_to_dribbler_distance = 0.0829
 
-    distance = np.sqrt((robot_x - ball_x) ** 2 + (robot_y - ball_y) ** 2)
-    return max(0.0, (1.0 - distance / 1.0))
+    robot_heading_unit_vector = np.array([np.cos(robot.r_z), np.sin(robot.r_z)])
+    # the ref point is approximately the dribbler point
+    ref_point = (
+        np.array([robot_x, robot_y])
+        + robot_heading_unit_vector * center_to_dribbler_distance
+    )
+
+    distance = np.linalg.norm(ball_pos - ref_point)
+    return max(0.0, (max_distance - distance) / max_distance)
 
 
 def possession_reward(sim_state, is_blue=False):
@@ -108,3 +117,19 @@ def kick_reward(sim_state, action, is_blue=False):
         if robots[0].can_kick_ball and action[3] > 0.5  # AUTO_KICK index
         else 0.0
     )
+
+
+def ball_toward_goal_reward(sim_state, ssl_geometry, is_blue=False):
+    # TODO: deal with blue side
+    if not sim_state or not sim_state.ball:
+        return 0.0
+
+    ball_pos = np.array([sim_state.ball.p_x, sim_state.ball.p_y])
+    goal_depth = ssl_geometry.field.goal_depth / 1000
+    field_length = ssl_geometry.field.field_length / 1000
+    reference_point = np.array([field_length / 2 + goal_depth, 0])
+    ball_to_goal_vec = reference_point - ball_pos
+    ball_to_goal_unit_vec = ball_to_goal_vec / np.linalg.norm(ball_to_goal_vec)
+    ball_velocity = np.array([sim_state.ball.v_x, sim_state.ball.v_y])
+    # 5 m/s directly toward the reference point saturates the reward
+    return np.clip(ball_velocity.dot(ball_to_goal_unit_vec) / 5, -1.0, 1.0)

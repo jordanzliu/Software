@@ -1,6 +1,5 @@
 from gymnasium.wrappers import TimeLimit
 from stable_baselines3 import PPO
-from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 from software.ml.simulator_env import SimulatorGymEnv
@@ -103,9 +102,9 @@ def train():
         SimulatorGymEnv(
             simulator_runtime_dir=f"{path}/thunderbots_simulator/{uuid.uuid4().__str__()[:8]}"
         ),
-        max_episode_steps=1000,
+        max_episode_steps=600,
     )  # set time limit to 5 real minutes per episode
-    vec_env = SubprocVecEnv([create_sim_env for i in range(6)])
+    vec_env = SubprocVecEnv([create_sim_env for i in range(5)])
     video_callback = VideoRecorderCallback(
         out_path=path, eval_env=create_sim_env(), render_freq=100_000, n_eval_episodes=1
     )
@@ -115,10 +114,11 @@ def train():
         vec_env,
         verbose=1,
         tensorboard_log=f"{path}/tb_logs",
-        learning_rate=5e-5
+        learning_rate=5e-5,
+        device="cpu",
     )
     model.set_logger(logger)
-    model.learn(total_timesteps=10_000_000, callback=video_callback)
+    model.learn(total_timesteps=100_000, callback=video_callback)
 
     model.save(f"{path}/thunderzero_model.ckpt")
 

@@ -216,8 +216,8 @@ void SimRobot::begin(SimBall &ball, double time)
     m_inStandby = false;
     // m_inStandby = m_command.standby();
 
-    // after 0.1s without new command reset to stop
-    if (m_commandTime > 0.1)
+    // after 0.2s without new command reset to stop
+    if (m_commandTime > 0.2)
     {
         m_sslCommand.Clear();
         // the real robot switches to standby after a short delay
