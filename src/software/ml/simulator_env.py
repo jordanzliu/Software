@@ -4,6 +4,8 @@ from gymnasium import spaces
 import numpy as np
 from enum import IntEnum
 
+from tensorboard.compat.tensorflow_stub.dtypes import uint8
+
 from software.thunderscope.binary_context_managers.simulator import Simulator
 from software.thunderscope.proto_unix_io import ProtoUnixIO
 from proto.import_all_protos import *
@@ -21,40 +23,8 @@ from software.ml.reward_functions import (
     ball_toward_goal_reward,
     position_reward,
 )
-from software.ml.utils import create_observation
+from software.ml.utils import create_observation, ActionIndex, ObservationIndex, convert_action_to_primitive_set
 from software.ml.render import render_simulator
-
-
-class ActionIndex(IntEnum):
-    VELOCITY_X = 0
-    VELOCITY_Y = 1
-    VELOCITY_ANGULAR = 2
-    AUTO_KICK = 3
-    AUTO_DRIBBLE = 4
-
-
-class ObservationIndex(IntEnum):
-    FRIENDLY_ROBOT_X = 0
-    FRIENDLY_ROBOT_Y = 1
-    FRIENDLY_ROBOT_VX = 2
-    FRIENDLY_ROBOT_VY = 3
-    FRIENDLY_ROBOT_HEADING_COS = 4
-    FRIENDLY_ROBOT_HEADING_SIN = 5
-    FRIENDLY_ROBOT_CAN_KICK = 6
-    ENEMY_ROBOT_REL_X = 7
-    ENEMY_ROBOT_REL_Y = 8
-    ENEMY_ROBOT_X = 9
-    ENEMY_ROBOT_Y = 10
-    ENEMY_ROBOT_VX = 11
-    ENEMY_ROBOT_VY = 12
-    ENEMY_ROBOT_HEADING_COS = 13
-    ENEMY_ROBOT_HEADING_SIN = 14
-    BALL_REL_X = 15
-    BALL_REL_Y = 16
-    BALL_X = 17
-    BALL_Y = 18
-    BALL_VX = 19
-    BALL_VY = 20
 
 
 class SimulatorGymEnv(gym.Env):
@@ -71,11 +41,12 @@ class SimulatorGymEnv(gym.Env):
         self.primitive_seq = 0
         self.ssl_geometry = None
 
-        # Define action space as Box
-        self.action_space = spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
+        # Define action space as MultiDiscrete.
+        # 4 directions, positive/negative orientation, auto-dribble, auto-kick
+        self.action_space = spaces.MultiDiscrete(nvec=[4, 2, 1, 1])
         # Define observation space as Box
         self.observation_space = spaces.Box(
-            low=-10, high=10, shape=(21,), dtype=np.float32
+            low=-10, high=10, shape=(int(ObservationIndex.SIZE),), dtype=np.float32
         )
 
         self.yellow_io = ProtoUnixIO()
@@ -91,79 +62,10 @@ class SimulatorGymEnv(gym.Env):
     def _get_obs(self, sim_state):
         return create_observation(sim_state, is_blue=False)
 
-    def _convert_action_to_primitive_set(self, sim_state, action):
-        if not sim_state.yellow_robots:
-            return PrimitiveSet()
 
-        # get the unit vector of the commanded velocity
-        velocity_command_vec = np.array(
-            [action[ActionIndex.VELOCITY_X], action[ActionIndex.VELOCITY_Y]]
-        )
-        velocity_command_vec /= np.linalg.norm(velocity_command_vec)
-        # scale by velocity limits
-        velocity_command_vec *= 3.0
-        angular_velocity = (
-            action[ActionIndex.VELOCITY_ANGULAR] * 10.0
-        )  # 10.0 rad/s max angular speed
-
-        # transform velocity into robot frame for the direct velocity primitive
-        robot = sim_state.yellow_robots[0]
-        robot_x_vector = np.array([np.cos(robot.r_z), np.sin(robot.r_z)])
-        robot_y_vector = np.array([np.sin(robot.r_z), -np.cos(robot.r_z)])
-        vel_x_robot_frame, vel_y_robot_frame = (
-            np.vstack((robot_x_vector, robot_y_vector)).T @ velocity_command_vec
-        )
-
-        # Create DirectVelocityControl
-        velocity_control = MotorControl.DirectVelocityControl()
-        velocity_control.velocity.x_component_meters = vel_x_robot_frame
-        velocity_control.velocity.y_component_meters = vel_y_robot_frame
-        velocity_control.angular_velocity.radians_per_second = angular_velocity
-
-        # Create MotorControl with DirectVelocityControl
-        motor_control = MotorControl()
-        motor_control.direct_velocity_control.CopyFrom(velocity_control)
-        motor_control.dribbler_speed_rpm = (
-            12000 if action[ActionIndex.AUTO_DRIBBLE] > 0 else 0
-        )
-
-        # Create power control primitive for auto kick
-        chicker_control = PowerControl.ChickerControl()
-        auto_kick = AutoChipOrKick()
-        # TODO: add to action space instead of hardcoding
-        auto_kick.autokick_speed_m_per_s = 5
-        chicker_control.auto_chip_or_kick.CopyFrom(auto_kick)
-        power_control = PowerControl()
-        if action[ActionIndex.AUTO_KICK] > 0.0:
-            power_control.chicker.CopyFrom(chicker_control)
-
-        # Create DirectControlPrimitive
-        control_primitive = DirectControlPrimitive()
-        control_primitive.motor_control.CopyFrom(motor_control)
-        control_primitive.power_control.CopyFrom(power_control)
-
-        primitive = Primitive()
-        primitive.direct_control.CopyFrom(control_primitive)
-        primitive.sequence_number = self.primitive_seq
-        self.primitive_seq += 1
-        primitive.time_sent.CopyFrom(Timestamp())
-
-        primitive_set = PrimitiveSet()
-        primitive_set.robot_primitives[0].CopyFrom(primitive)
-        primitive_set.time_sent.CopyFrom(Timestamp())
-
-        return primitive_set
-
-    def _compute_reward(self, sim_state, action, is_blue=False):
+    def _compute_reward(self, sim_state, is_blue=False):
         return (
-            position_reward(sim_state, self.ssl_geometry)
-            + goal_reward(sim_state, self.ssl_geometry, is_blue) * 10
-            + distance_reward(sim_state, max_distance=1.0, is_blue=is_blue) * 0.1
-            + distance_reward(sim_state, max_distance=0.1, is_blue=is_blue) * 0.1
-            + face_ball_orientation_reward(sim_state, is_blue) * 0.05
-            + possession_reward(sim_state, is_blue) * 0.1
-            # + dribble_reward(sim_state, action, is_blue)
-            + kick_reward(sim_state, action, is_blue)
+            goal_reward(sim_state, self.ssl_geometry, is_blue) * 10
             + ball_toward_goal_reward(sim_state, self.ssl_geometry, is_blue)
         )
 
@@ -239,13 +141,14 @@ class SimulatorGymEnv(gym.Env):
         self.ssl_geometry = self.ssl_wrapper_buffer.get(
             block=True, return_cached=False
         ).geometry
-        return create_observation(self.sim_state, is_blue=False), {}
+        return create_observation(self.sim_state, self.ssl_geometry, 0, is_blue=False), {}
 
     def step(self, action):
-        primitive_set = self._convert_action_to_primitive_set(self.sim_state, action)
+        SIM_TICKS_PER_ACTION = 5
+        primitive_set, self.primitive_seq = convert_action_to_primitive_set(self.sim_state, action, self.primitive_seq)
         self.yellow_io.send_proto(PrimitiveSet, primitive_set)
-        # tick the simulator at 100hz but only plan at 10hz
-        for i in range(9):
+        # tick the simulator at 100hz but only plan at 20hz
+        for i in range(SIM_TICKS_PER_ACTION):
             tick = SimulatorTick(milliseconds=10)
             self.simulator_io.send_proto(SimulatorTick, tick)
 
@@ -270,8 +173,8 @@ class SimulatorGymEnv(gym.Env):
             block=True, return_cached=False
         ).geometry
 
-        obs = create_observation(self.sim_state, is_blue=False)
-        reward = self._compute_reward(self.sim_state, action)
+        obs = create_observation(self.sim_state, self.ssl_geometry, 0, is_blue=False)
+        reward = self._compute_reward(self.sim_state)
         terminated = is_ball_in_enemy_goal(self.sim_state, self.ssl_geometry)
         truncated = False
         self.last_action = action

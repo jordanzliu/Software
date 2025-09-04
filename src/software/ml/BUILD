@@ -67,6 +67,7 @@ py_library(
         "//proto/message_translation:py_tbots_protobuf",
         requirement("numpy"),
         requirement("numpy-quaternion"),
+        requirement("torch")
     ],
 )
 

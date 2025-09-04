@@ -1,12 +1,4 @@
-from software.ml.reward_functions import (
-    goal_reward,
-    distance_reward,
-    possession_reward,
-    face_ball_orientation_reward,
-    dribble_reward,
-    kick_reward,
-    ball_toward_goal_reward,
-)
+from software.ml.utils import create_observation, ObservationIndex
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
@@ -162,39 +154,44 @@ def render_simulator(sim_state, ssl_geometry, action=None, is_blue=False):
     ax.set_facecolor("darkgreen")
     ax.axis("off")
 
-    # Reward panel
-    reward_ax.set_xlim(0, 1)
-    reward_ax.set_ylim(0, 1)
-    reward_ax.axis("off")
-    reward_ax.set_facecolor("black")
+    # Robot-centric observation panel
+    reward_ax.set_xlim(-3, 3)
+    reward_ax.set_ylim(-3, 3)
+    reward_ax.set_aspect("equal")
+    reward_ax.set_facecolor("darkgreen")
+    reward_ax.set_title("Robot View", color="white", fontsize=8)
 
-    # Calculate rewards
-    rewards = {
-        "Goal": goal_reward(sim_state, ssl_geometry, is_blue),
-        "Distance": distance_reward(sim_state, is_blue),
-        "Possession": possession_reward(sim_state, is_blue),
-        "Face Ball": face_ball_orientation_reward(sim_state, is_blue),
-        "Dribble": dribble_reward(sim_state, action, is_blue)
-        if action is not None
-        else 0.0,
-        "Kick": kick_reward(sim_state, action, is_blue) if action is not None else 0.0,
-        "Ball toward goal": ball_toward_goal_reward(sim_state, ssl_geometry, is_blue),
-        "dribbler": action[4] if action is not None else 0.0,
-        "kick": action[3] if action is not None else 0.0,
-    }
-
-    # Display rewards
-    y_pos = 0.9
-    for name, value in rewards.items():
-        reward_ax.text(
-            0.05,
-            y_pos,
-            f"{name}: {value:.3f}",
-            color="black",
-            fontsize=6,
-            transform=reward_ax.transAxes,
-        )
-        y_pos -= 0.07
+    # Render robot-centric world
+    if sim_state and sim_state.yellow_robots:
+        obs = create_observation(sim_state, ssl_geometry, 0, is_blue)
+        
+        # Friendly robot at origin (0,0)
+        robot_circle = patches.Circle((0, 0), 0.09, facecolor="yellow", edgecolor="black")
+        reward_ax.add_patch(robot_circle)
+        
+        # Enemy robot
+        enemy_x = obs[ObservationIndex.ENEMY_ROBOT_REL_X].item()
+        enemy_y = obs[ObservationIndex.ENEMY_ROBOT_REL_Y].item()
+        enemy_circle = patches.Circle((enemy_x, enemy_y), 0.09, facecolor="blue", edgecolor="black")
+        reward_ax.add_patch(enemy_circle)
+        
+        # Ball
+        ball_x = obs[ObservationIndex.BALL_REL_X].item()
+        ball_y = obs[ObservationIndex.BALL_REL_Y].item()
+        ball_circle = patches.Circle((ball_x, ball_y), 0.0215, facecolor="orange", edgecolor="black")
+        reward_ax.add_patch(ball_circle)
+        
+        # Goal posts
+        goal_top_x = obs[ObservationIndex.GOAL_TOP_REL_X].item()
+        goal_top_y = obs[ObservationIndex.GOAL_TOP_REL_Y].item()
+        goal_bottom_x = obs[ObservationIndex.GOAL_BOTTOM_REL_X].item()
+        goal_bottom_y = obs[ObservationIndex.GOAL_BOTTOM_REL_Y].item()
+        reward_ax.plot([goal_top_x, goal_bottom_x], [goal_top_y, goal_bottom_y], "w-", linewidth=3)
+        
+        # Ball velocity vector
+        ball_vx = obs[ObservationIndex.BALL_REL_VX].item()
+        ball_vy = obs[ObservationIndex.BALL_REL_VY].item()
+        reward_ax.arrow(ball_x, ball_y, ball_vx*0.1, ball_vy*0.1, head_width=0.05, head_length=0.05, fc="red", ec="red")
 
     fig.canvas.draw()
     buf = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)

@@ -104,7 +104,7 @@ def train():
         ),
         max_episode_steps=600,
     )  # set time limit to 5 real minutes per episode
-    vec_env = SubprocVecEnv([create_sim_env for i in range(5)])
+    vec_env = SubprocVecEnv([create_sim_env for i in range(10)])
     video_callback = VideoRecorderCallback(
         out_path=path, eval_env=create_sim_env(), render_freq=100_000, n_eval_episodes=1
     )
@@ -118,7 +118,7 @@ def train():
         device="cpu",
     )
     model.set_logger(logger)
-    model.learn(total_timesteps=100_000, callback=video_callback)
+    model.learn(total_timesteps=10_000_000, callback=video_callback)
 
     model.save(f"{path}/thunderzero_model.ckpt")
 
